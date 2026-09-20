@@ -1,0 +1,118 @@
+import type { Metadata } from "next"
+import Link from "next/link"
+import { notFound } from "next/navigation"
+import { z } from "zod"
+import { DescargarAdjunto } from "@/components/descargar-adjunto"
+import { EstadoBadge } from "@/components/estado-badge"
+import { HistorialTimeline, type EventoHistorial } from "@/components/historial-timeline"
+import { MensajeFormulario } from "@/components/mensaje-formulario"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { requerirPerfil } from "@/lib/auth"
+import { ETIQUETA_TIPO } from "@/lib/dominio"
+import { formatearFechaHora } from "@/lib/fechas"
+import { createClient } from "@/lib/supabase/server"
+
+export const metadata: Metadata = { title: "Detalle de solicitud" }
+
+export default async function DetalleSolicitudPage({ params, searchParams }: PageProps<"/mis-solicitudes/[id]">) {
+  const { id } = await params
+  const { creada } = await searchParams
+  if (!z.uuid().safeParse(id).success) notFound()
+
+  const perfil = await requerirPerfil("estudiante")
+  const supabase = await createClient()
+  const [{ data: solicitud }, { data: historial }] = await Promise.all([
+    supabase
+      .from("solicitudes")
+      .select("id, asunto, tipo, descripcion, estado, observaciones, origen, adjunto_path, creada")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("historial_estados")
+      .select("id, estado_anterior, estado_nuevo, observacion, usuario_id, fecha")
+      .eq("solicitud_id", id)
+      .order("fecha"),
+  ])
+  if (!solicitud) notFound()
+
+  // El estudiante no puede leer perfiles de otros (RLS), así que el autor se muestra por rol.
+  const eventos: EventoHistorial[] = (historial ?? []).map((h) => ({
+    id: h.id,
+    estadoAnterior: h.estado_anterior,
+    estadoNuevo: h.estado_nuevo,
+    observacion: h.observacion,
+    fecha: h.fecha,
+    autor:
+      h.usuario_id === perfil.id
+        ? "Tú"
+        : h.usuario_id
+          ? "Coordinación académica"
+          : solicitud.origen === "correo" && h.estado_anterior === null
+            ? "Recibida por correo"
+            : "Sistema",
+  }))
+
+  return (
+    <div className="grid gap-6">
+      <div className="grid gap-2">
+        <Link href="/mis-solicitudes" className="text-sm text-muted-foreground hover:underline">
+          ← Mis solicitudes
+        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">{solicitud.asunto}</h1>
+          <EstadoBadge estado={solicitud.estado} />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {ETIQUETA_TIPO[solicitud.tipo]} · Registrada el {formatearFechaHora(solicitud.creada)}
+          {solicitud.origen === "correo" && (
+            <Badge variant="secondary" className="ml-2">
+              Recibida por correo
+            </Badge>
+          )}
+        </p>
+      </div>
+
+      {creada === "1" && (
+        <MensajeFormulario ok mensaje="Tu solicitud quedó registrada como Pendiente. Aquí verás cada avance." />
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid content-start gap-6 lg:col-span-2">
+          {solicitud.observaciones && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Respuesta de la coordinación</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="whitespace-pre-wrap">{solicitud.observaciones}</p>
+              </CardContent>
+            </Card>
+          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tu solicitud</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <p className="whitespace-pre-wrap">{solicitud.descripcion}</p>
+              {solicitud.adjunto_path && (
+                <DescargarAdjunto
+                  solicitudId={solicitud.id}
+                  nombre={solicitud.adjunto_path.split("/").pop() ?? "Adjunto"}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        <Card className="content-start">
+          <CardHeader>
+            <CardTitle>Seguimiento</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <HistorialTimeline eventos={eventos} />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
