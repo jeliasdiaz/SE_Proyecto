@@ -126,7 +126,7 @@ export default async function BandejaPage({ searchParams }: PageProps<"/admin">)
 
   return (
     <TransicionPagina>
-      <div className="grid gap-5">
+      <div className="grid min-w-0 gap-5">
         <div>
           <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Bandeja de solicitudes</h1>
           <p className="text-sm text-muted-foreground">
@@ -135,8 +135,8 @@ export default async function BandejaPage({ searchParams }: PageProps<"/admin">)
           </p>
         </div>
 
-        <div className="grid gap-3">
-          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b">
+        <div className="grid min-w-0 gap-3">
+          <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b">
             <PestanasEstado pestanas={pestanas} activa={filtros.estado ?? "todas"} />
             {(porRevisar > 0 || filtros.porRevisar) && (
               <Link
@@ -253,7 +253,7 @@ async function TablaSolicitudes({ filtros, hayFiltros }: { filtros: Filtros; hay
   // Mobile-first con un solo marcado: en móvil cada fila es una tarjeta (flex) y desde md vuelve a
   // ser tabla. El estado se repite dentro de la primera celda solo en móvil.
   return (
-    <Card className="py-0">
+    <Card className="min-w-0 py-0">
       <Table className="block md:table">
         <TableHeader className="hidden md:table-header-group">
           <TableRow>
@@ -283,7 +283,7 @@ async function TablaSolicitudes({ filtros, hayFiltros }: { filtros: Filtros; hay
                   </Link>
                   <EstadoBadge estado={s.estado} className="shrink-0 md:hidden" />
                 </div>
-                <p className="truncate text-xs text-muted-foreground md:max-w-md">{extracto(s.descripcion)}</p>
+                <p className="line-clamp-2 text-xs text-muted-foreground md:max-w-md md:truncate">{extracto(s.descripcion)}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                   <span>{s.estudiante?.nombre}</span>
                   {s.origen === "correo" && <Badge variant="secondary">Correo</Badge>}
@@ -293,13 +293,13 @@ async function TablaSolicitudes({ filtros, hayFiltros }: { filtros: Filtros; hay
                   )}
                 </div>
               </TableCell>
-              <TableCell className="block p-0 text-xs text-muted-foreground md:table-cell md:p-2 md:text-sm md:text-foreground">
+              <TableCell className="block min-w-0 p-0 text-xs text-muted-foreground md:table-cell md:p-2 md:text-sm md:text-foreground">
                 {ETIQUETA_TIPO[s.tipo]}
               </TableCell>
               <TableCell className="hidden md:table-cell">
                 <EstadoBadge estado={s.estado} />
               </TableCell>
-              <TableCell className="block p-0 text-xs text-muted-foreground before:mr-2 before:content-['·'] md:table-cell md:p-2 md:text-sm md:text-foreground md:before:content-none">
+              <TableCell className="block min-w-0 p-0 text-xs text-muted-foreground before:mr-2 before:content-['·'] md:table-cell md:p-2 md:text-sm md:text-foreground md:before:content-none">
                 <time dateTime={s.creada}>{formatearFecha(s.creada)}</time>
               </TableCell>
               <TableCell className="ml-auto block p-0 text-xs md:table-cell md:p-2 md:pr-4 md:text-sm">

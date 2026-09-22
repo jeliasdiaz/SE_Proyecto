@@ -22,9 +22,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* viewTransitionName: el header no se desliza con el contenido (ver globals.css). */}
       <header
         style={{ viewTransitionName: "site-header" }}
-        className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur"
+        className="sticky top-0 z-40 w-full border-b bg-background/85 backdrop-blur"
       >
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-4 py-2">
+        <div className="mx-auto flex w-full min-w-0 max-w-6xl items-center gap-6 px-4 py-2">
           <Link href="/" className="min-w-0 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             <Marca />
           </Link>

@@ -60,7 +60,7 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
       onSubmit={enviar}
       role="search"
       aria-busy={pendiente}
-      className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center"
+      className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center"
     >
       {estado && <input type="hidden" name="estado" value={estado} />}
       {porRevisar && <input type="hidden" name="revision" value="por_revisar" />}
