@@ -1,20 +1,20 @@
 import Link from "next/link"
 import { Marca } from "@/components/marca"
 import { MenuUsuario } from "@/components/menu-usuario"
-import { NavPrincipal } from "@/components/nav-principal"
+import { NavInferior, NavPrincipal, type Enlace } from "@/components/nav-principal"
 import { requerirPerfil } from "@/lib/auth"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const perfil = await requerirPerfil()
-  const enlaces =
+  const enlaces: Enlace[] =
     perfil.rol === "admin"
       ? [
-          { href: "/admin", etiqueta: "Bandeja" },
-          { href: "/admin/metricas", etiqueta: "Métricas" },
+          { href: "/admin", etiqueta: "Bandeja", icono: "bandeja" },
+          { href: "/admin/metricas", etiqueta: "Métricas", icono: "metricas" },
         ]
       : [
-          { href: "/mis-solicitudes", etiqueta: "Mis solicitudes" },
-          { href: "/mis-solicitudes/nueva", etiqueta: "Nueva solicitud" },
+          { href: "/mis-solicitudes", etiqueta: "Mis solicitudes", icono: "solicitudes" },
+          { href: "/mis-solicitudes/nueva", etiqueta: "Nueva solicitud", icono: "nueva" },
         ]
 
   return (
@@ -24,17 +24,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         style={{ viewTransitionName: "site-header" }}
         className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur"
       >
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2">
-          <Link href="/" className="rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-4 py-2">
+          <Link href="/" className="min-w-0 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             <Marca />
           </Link>
           <NavPrincipal enlaces={enlaces} />
-          <div className="ml-auto">
+          <div className="ml-auto shrink-0">
             <MenuUsuario nombre={perfil.nombre} correo={perfil.correo} rol={perfil.rol} />
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      {/* En móvil deja libre el espacio de la barra inferior (64 px + zona segura). */}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:py-8">
+        {children}
+      </main>
+      <NavInferior enlaces={enlaces} />
     </>
   )
 }

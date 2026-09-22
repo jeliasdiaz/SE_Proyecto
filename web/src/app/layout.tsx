@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 // Fuentes locales (vienen en node_modules): no dependen de descargar Google Fonts al compilar.
 import { GeistMono } from "geist/font/mono"
 import { GeistSans } from "geist/font/sans"
@@ -13,6 +13,12 @@ export const metadata: Metadata = {
     template: `%s · ${NOMBRE_APP}`,
   },
   description: "Registro y seguimiento de solicitudes académicas.",
+}
+
+// cover: la barra inferior móvil usa env(safe-area-inset-bottom) para no quedar bajo el indicador de inicio de iOS.
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  themeColor: "#ffffff",
 }
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

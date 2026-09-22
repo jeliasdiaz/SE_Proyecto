@@ -5,6 +5,7 @@ import { Campo } from "@/components/campo"
 import { MensajeFormulario } from "@/components/mensaje-formulario"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
 import type { EstadoFormulario } from "@/lib/validacion"
 import { solicitarRecuperacion } from "../actions"
 
@@ -29,6 +30,7 @@ export function FormularioRecuperar() {
         />
       </Campo>
       <Button type="submit" size="lg" disabled={enviando}>
+        {enviando && <Spinner data-icon="inline-start" />}
         {enviando ? "Enviando…" : "Enviar enlace"}
       </Button>
     </form>

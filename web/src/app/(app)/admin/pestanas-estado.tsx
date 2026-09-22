@@ -8,7 +8,10 @@ export type Pestana = { clave: string; etiqueta: string; conteo: number; href: s
 
 export function PestanasEstado({ pestanas, activa }: { pestanas: Pestana[]; activa: string }) {
   return (
-    <nav aria-label="Estado" className="-mb-px flex overflow-x-auto">
+    <nav
+      aria-label="Estado"
+      className="-mb-px flex w-full overflow-x-auto [scrollbar-width:none] sm:w-auto [&::-webkit-scrollbar]:hidden"
+    >
       {pestanas.map((pestana) => {
         const esActiva = pestana.clave === activa
         return (

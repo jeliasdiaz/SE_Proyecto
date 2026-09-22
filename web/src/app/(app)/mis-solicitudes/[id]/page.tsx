@@ -6,6 +6,7 @@ import { DescargarAdjunto } from "@/components/descargar-adjunto"
 import { EstadoBadge } from "@/components/estado-badge"
 import { HistorialTimeline, type EventoHistorial } from "@/components/historial-timeline"
 import { MensajeFormulario } from "@/components/mensaje-formulario"
+import { TransicionPagina } from "@/components/transicion-pagina"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { requerirPerfil } from "@/lib/auth"
@@ -54,65 +55,71 @@ export default async function DetalleSolicitudPage({ params, searchParams }: Pag
   }))
 
   return (
-    <div className="grid gap-6">
-      <div className="grid gap-2">
-        <Link href="/mis-solicitudes" className="text-sm text-muted-foreground hover:underline">
-          ← Mis solicitudes
-        </Link>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{solicitud.asunto}</h1>
-          <EstadoBadge estado={solicitud.estado} />
+    <TransicionPagina>
+      <div className="grid gap-6">
+        <div className="grid gap-2">
+          <Link
+            href="/mis-solicitudes"
+            transitionTypes={["nav-back"]}
+            className="w-fit text-sm text-muted-foreground hover:underline"
+          >
+            ← Mis solicitudes
+          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">{solicitud.asunto}</h1>
+            <EstadoBadge estado={solicitud.estado} />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {ETIQUETA_TIPO[solicitud.tipo]} · Registrada el {formatearFechaHora(solicitud.creada)}
+            {solicitud.origen === "correo" && (
+              <Badge variant="secondary" className="ml-2">
+                Recibida por correo
+              </Badge>
+            )}
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {ETIQUETA_TIPO[solicitud.tipo]} · Registrada el {formatearFechaHora(solicitud.creada)}
-          {solicitud.origen === "correo" && (
-            <Badge variant="secondary" className="ml-2">
-              Recibida por correo
-            </Badge>
-          )}
-        </p>
-      </div>
 
-      {creada === "1" && (
-        <MensajeFormulario ok mensaje="Tu solicitud quedó registrada como Pendiente. Aquí verás cada avance." />
-      )}
+        {creada === "1" && (
+          <MensajeFormulario ok mensaje="Tu solicitud quedó registrada como Pendiente. Aquí verás cada avance." />
+        )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="grid content-start gap-6 lg:col-span-2">
-          {solicitud.observaciones && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid content-start gap-6 lg:col-span-2">
+            {solicitud.observaciones && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Respuesta de la coordinación</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="whitespace-pre-wrap">{solicitud.observaciones}</p>
+                </CardContent>
+              </Card>
+            )}
             <Card>
               <CardHeader>
-                <CardTitle>Respuesta de la coordinación</CardTitle>
+                <CardTitle>Tu solicitud</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-wrap">{solicitud.observaciones}</p>
+              <CardContent className="grid gap-4">
+                <p className="whitespace-pre-wrap">{solicitud.descripcion}</p>
+                {solicitud.adjunto_path && (
+                  <DescargarAdjunto
+                    solicitudId={solicitud.id}
+                    nombre={solicitud.adjunto_path.split("/").pop() ?? "Adjunto"}
+                  />
+                )}
               </CardContent>
             </Card>
-          )}
-          <Card>
+          </div>
+          <Card className="content-start">
             <CardHeader>
-              <CardTitle>Tu solicitud</CardTitle>
+              <CardTitle>Seguimiento</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4">
-              <p className="whitespace-pre-wrap">{solicitud.descripcion}</p>
-              {solicitud.adjunto_path && (
-                <DescargarAdjunto
-                  solicitudId={solicitud.id}
-                  nombre={solicitud.adjunto_path.split("/").pop() ?? "Adjunto"}
-                />
-              )}
+            <CardContent>
+              <HistorialTimeline eventos={eventos} />
             </CardContent>
           </Card>
         </div>
-        <Card className="content-start">
-          <CardHeader>
-            <CardTitle>Seguimiento</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <HistorialTimeline eventos={eventos} />
-          </CardContent>
-        </Card>
       </div>
-    </div>
+    </TransicionPagina>
   )
 }

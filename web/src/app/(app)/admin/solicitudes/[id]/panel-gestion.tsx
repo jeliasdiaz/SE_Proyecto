@@ -4,6 +4,7 @@ import { useActionState, useState } from "react"
 import { Campo } from "@/components/campo"
 import { MensajeFormulario } from "@/components/mensaje-formulario"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import { ETIQUETA_ESTADO, TRANSICIONES, exigeObservacion, type Estado } from "@/lib/dominio"
@@ -79,6 +80,7 @@ export function PanelGestion({ solicitudId, estadoActual }: { solicitudId: strin
         />
       </Campo>
       <Button type="submit" disabled={enviando || destino === ""}>
+        {enviando && <Spinner data-icon="inline-start" />}
         {enviando ? "Guardando…" : "Cambiar estado"}
       </Button>
     </form>

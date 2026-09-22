@@ -2,9 +2,11 @@
 
 import { useActionState } from "react"
 import { Campo } from "@/components/campo"
+import { InputClave } from "@/components/input-clave"
 import { MensajeFormulario } from "@/components/mensaje-formulario"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
 import type { EstadoFormulario } from "@/lib/validacion"
 import { registrarse } from "../actions"
 
@@ -56,10 +58,9 @@ export function FormularioRegistro() {
         errores={estado.errores?.clave}
         ayuda="Mínimo 8 caracteres, con letras y números."
       >
-        <Input
+        <InputClave
           id="clave"
           name="clave"
-          type="password"
           autoComplete="new-password"
           required
           aria-invalid={Boolean(estado.errores?.clave)}
@@ -67,10 +68,9 @@ export function FormularioRegistro() {
         />
       </Campo>
       <Campo id="confirmacion" etiqueta="Repite la contraseña" errores={estado.errores?.confirmacion}>
-        <Input
+        <InputClave
           id="confirmacion"
           name="confirmacion"
-          type="password"
           autoComplete="new-password"
           required
           aria-invalid={Boolean(estado.errores?.confirmacion)}
@@ -78,6 +78,7 @@ export function FormularioRegistro() {
         />
       </Campo>
       <Button type="submit" size="lg" disabled={enviando}>
+        {enviando && <Spinner data-icon="inline-start" />}
         {enviando ? "Creando cuenta…" : "Crear cuenta"}
       </Button>
     </form>

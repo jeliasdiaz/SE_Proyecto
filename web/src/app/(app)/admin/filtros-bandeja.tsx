@@ -33,6 +33,8 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
     if (!campoConFoco) return
     const campo = formulario.current?.querySelector<HTMLElement>(`[name="${campoConFoco}"]`)
     campoConFoco = null
+    // En pantallas táctiles, enfocar el buscador volvería a abrir el teclado.
+    if (campo instanceof HTMLInputElement && window.matchMedia("(pointer: coarse)").matches) return
     campo?.focus()
   }, [])
 
@@ -58,15 +60,15 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
       onSubmit={enviar}
       role="search"
       aria-busy={pendiente}
-      className="flex flex-wrap items-center gap-2"
+      className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center"
     >
       {estado && <input type="hidden" name="estado" value={estado} />}
       {porRevisar && <input type="hidden" name="revision" value="por_revisar" />}
-      <div className="relative min-w-56 flex-1">
+      <div className="relative col-span-2 sm:min-w-56 sm:flex-1">
         <button
           type="submit"
           aria-label="Buscar"
-          className="absolute inset-y-0 left-0 grid w-8 place-items-center rounded-l-lg text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground"
+          className="absolute inset-y-0 left-0 grid w-10 place-items-center md:w-8 rounded-l-lg text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground"
         >
           <SearchIcon className="size-4" />
         </button>
@@ -76,11 +78,17 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
           defaultValue={q}
           placeholder="Buscar en asunto o descripción"
           aria-label="Buscar en asunto o descripción"
-          className="pr-8 pl-8"
+          className="pr-8 pl-10 md:pl-8"
         />
         {pendiente && <Spinner className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground" />}
       </div>
-      <NativeSelect name="tipo" aria-label="Tipo" defaultValue={tipo ?? ""} onChange={aplicar} className="min-w-44">
+      <NativeSelect
+        name="tipo"
+        aria-label="Tipo"
+        defaultValue={tipo ?? ""}
+        onChange={aplicar}
+        className="w-full sm:w-fit sm:min-w-44"
+      >
         <NativeSelectOption value="">Todos los tipos</NativeSelectOption>
         {TIPOS.map((t) => (
           <NativeSelectOption key={t} value={t}>
@@ -88,7 +96,13 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
           </NativeSelectOption>
         ))}
       </NativeSelect>
-      <NativeSelect name="origen" aria-label="Origen" defaultValue={origen ?? ""} onChange={aplicar} className="min-w-40">
+      <NativeSelect
+        name="origen"
+        aria-label="Origen"
+        defaultValue={origen ?? ""}
+        onChange={aplicar}
+        className="w-full sm:w-fit sm:min-w-40"
+      >
         <NativeSelectOption value="">Cualquier origen</NativeSelectOption>
         {ORIGENES.map((o) => (
           <NativeSelectOption key={o} value={o}>
@@ -97,7 +111,7 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
         ))}
       </NativeSelect>
       {hayFiltros && (
-        <Button asChild variant="ghost">
+        <Button asChild variant="ghost" className="col-span-2 sm:col-auto">
           <Link href="/admin" scroll={false}>
             Limpiar
           </Link>

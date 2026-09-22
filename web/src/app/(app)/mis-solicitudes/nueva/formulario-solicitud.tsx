@@ -5,6 +5,7 @@ import { Campo } from "@/components/campo"
 import { MensajeFormulario } from "@/components/mensaje-formulario"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -128,7 +129,8 @@ export function FormularioSolicitud({ estudianteId }: { estudianteId: string }) 
         />
       </Campo>
       <div className="flex justify-end">
-        <Button type="submit" size="lg" disabled={enviando}>
+        <Button type="submit" size="lg" disabled={enviando} className="w-full sm:w-auto">
+          {enviando && <Spinner data-icon="inline-start" />}
           {enviando ? "Registrando…" : "Registrar solicitud"}
         </Button>
       </div>

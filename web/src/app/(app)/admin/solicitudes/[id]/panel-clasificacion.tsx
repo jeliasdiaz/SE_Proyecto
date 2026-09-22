@@ -4,6 +4,7 @@ import { useActionState } from "react"
 import { Campo } from "@/components/campo"
 import { MensajeFormulario } from "@/components/mensaje-formulario"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { ETIQUETA_TIPO, TIPOS, type Tipo } from "@/lib/dominio"
 import type { EstadoFormulario } from "@/lib/validacion"
@@ -36,6 +37,7 @@ export function PanelClasificacion({ solicitudId, tipoActual, porRevisar }: Prop
         </NativeSelect>
       </Campo>
       <Button type="submit" variant={porRevisar ? "default" : "outline"} disabled={enviando}>
+        {enviando && <Spinner data-icon="inline-start" />}
         {enviando ? "Guardando…" : porRevisar ? "Confirmar tipo y marcar revisada" : "Guardar tipo"}
       </Button>
     </form>

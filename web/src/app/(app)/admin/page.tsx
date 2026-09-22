@@ -49,7 +49,10 @@ function leerFiltros(parametros: Parametros) {
     origen: esOrigen(origen) ? origen : undefined,
     porRevisar: texto(parametros.revision) === "por_revisar",
     // Sin caracteres con significado en la sintaxis de filtros de PostgREST.
-    q: texto(parametros.q).replace(/[,()"'\\%*]/g, " ").trim().slice(0, 80),
+    q: texto(parametros.q)
+      .replace(/[,()"'\\%*]/g, " ")
+      .trim()
+      .slice(0, 80),
     pagina: Number.isFinite(pagina) && pagina > 0 ? pagina : 1,
   }
 }
@@ -107,7 +110,12 @@ export default async function BandejaPage({ searchParams }: PageProps<"/admin">)
   const hayFiltros = Boolean(filtros.estado || filtros.tipo || filtros.origen || filtros.porRevisar || filtros.q)
 
   const pestanas: Pestana[] = [
-    { clave: "todas", etiqueta: "Todas", conteo: todas, href: enlaceConFiltros(filtros, { estado: undefined, pagina: 1 }) },
+    {
+      clave: "todas",
+      etiqueta: "Todas",
+      conteo: todas,
+      href: enlaceConFiltros(filtros, { estado: undefined, pagina: 1 }),
+    },
     ...ESTADOS.map((estado) => ({
       clave: estado,
       etiqueta: ETIQUETA_ESTADO[estado],
@@ -120,7 +128,7 @@ export default async function BandejaPage({ searchParams }: PageProps<"/admin">)
     <TransicionPagina>
       <div className="grid gap-5">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Bandeja de solicitudes</h1>
+          <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Bandeja de solicitudes</h1>
           <p className="text-sm text-muted-foreground">
             {total} {total === 1 ? "solicitud" : "solicitudes"}
             {hayFiltros && " con los filtros aplicados"}
@@ -135,7 +143,9 @@ export default async function BandejaPage({ searchParams }: PageProps<"/admin">)
                 href={enlaceConFiltros(filtros, { porRevisar: !filtros.porRevisar, pagina: 1 })}
                 scroll={false}
                 className={cn(
-                  "mb-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  // En móvil va arriba: si quedara en una segunda línea, el subrayado de las pestañas
+                  // no coincidiría con el borde inferior.
+                  "order-first inline-flex items-center gap-1.5 rounded-full border sm:order-none sm:mb-2 px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                   filtros.porRevisar
                     ? "border-violet-300 bg-violet-100 text-violet-900 hover:bg-violet-200"
                     : "border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100"
@@ -240,10 +250,12 @@ async function TablaSolicitudes({ filtros, hayFiltros }: { filtros: Filtros; hay
 
   const ahora = new Date()
 
+  // Mobile-first con un solo marcado: en móvil cada fila es una tarjeta (flex) y desde md vuelve a
+  // ser tabla. El estado se repite dentro de la primera celda solo en móvil.
   return (
     <Card className="py-0">
-      <Table>
-        <TableHeader>
+      <Table className="block md:table">
+        <TableHeader className="hidden md:table-header-group">
           <TableRow>
             <TableHead className="pl-4">Solicitud</TableHead>
             <TableHead>Tipo</TableHead>
@@ -252,23 +264,26 @@ async function TablaSolicitudes({ filtros, hayFiltros }: { filtros: Filtros; hay
             <TableHead className="pr-4">Último cambio</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody className="block md:table-row-group">
           {solicitudes.map((s, i) => (
             <TableRow
               key={s.id}
-              className="relative animate-in duration-300 fill-mode-both fade-in slide-in-from-bottom-1"
+              className="relative flex animate-in flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 duration-300 fill-mode-both fade-in slide-in-from-bottom-1 md:table-row md:p-0"
               style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
             >
-              <TableCell className="pl-4">
-                {/* Enlace estirado: el ::after cubre toda la fila, pero sigue siendo un <a> real. */}
-                <Link
-                  href={`/admin/solicitudes/${s.id}`}
-                  transitionTypes={["nav-forward"]}
-                  className="block max-w-md truncate font-medium outline-none after:absolute after:inset-0 hover:underline focus-visible:after:ring-2 focus-visible:after:ring-ring/50 focus-visible:after:ring-inset"
-                >
-                  {s.asunto}
-                </Link>
-                <p className="max-w-md truncate text-xs text-muted-foreground">{extracto(s.descripcion)}</p>
+              <TableCell className="block basis-full p-0 whitespace-normal md:table-cell md:p-2 md:pl-4 md:whitespace-nowrap">
+                <div className="flex items-start justify-between gap-3">
+                  {/* Enlace estirado: el ::after cubre toda la fila, pero sigue siendo un <a> real. */}
+                  <Link
+                    href={`/admin/solicitudes/${s.id}`}
+                    transitionTypes={["nav-forward"]}
+                    className="line-clamp-2 min-w-0 font-medium outline-none after:absolute after:inset-0 hover:underline focus-visible:after:ring-2 focus-visible:after:ring-ring/50 focus-visible:after:ring-inset md:block md:max-w-md md:truncate"
+                  >
+                    {s.asunto}
+                  </Link>
+                  <EstadoBadge estado={s.estado} className="shrink-0 md:hidden" />
+                </div>
+                <p className="truncate text-xs text-muted-foreground md:max-w-md">{extracto(s.descripcion)}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                   <span>{s.estudiante?.nombre}</span>
                   {s.origen === "correo" && <Badge variant="secondary">Correo</Badge>}
@@ -278,14 +293,16 @@ async function TablaSolicitudes({ filtros, hayFiltros }: { filtros: Filtros; hay
                   )}
                 </div>
               </TableCell>
-              <TableCell>{ETIQUETA_TIPO[s.tipo]}</TableCell>
-              <TableCell>
+              <TableCell className="block p-0 text-xs text-muted-foreground md:table-cell md:p-2 md:text-sm md:text-foreground">
+                {ETIQUETA_TIPO[s.tipo]}
+              </TableCell>
+              <TableCell className="hidden md:table-cell">
                 <EstadoBadge estado={s.estado} />
               </TableCell>
-              <TableCell>
+              <TableCell className="block p-0 text-xs text-muted-foreground before:mr-2 before:content-['·'] md:table-cell md:p-2 md:text-sm md:text-foreground md:before:content-none">
                 <time dateTime={s.creada}>{formatearFecha(s.creada)}</time>
               </TableCell>
-              <TableCell className="pr-4">
+              <TableCell className="ml-auto block p-0 text-xs md:table-cell md:p-2 md:pr-4 md:text-sm">
                 <UltimoCambio estado={s.estado} actualizada={s.actualizada} ahora={ahora} />
               </TableCell>
             </TableRow>
@@ -325,7 +342,7 @@ function UltimoCambio({ estado, actualizada, ahora }: { estado: Estado; actualiz
 function TablaSkeleton() {
   return (
     <Card className="gap-0 py-0" aria-busy aria-label="Cargando solicitudes">
-      <div className="flex h-10 items-center gap-6 border-b px-4">
+      <div className="hidden h-10 items-center gap-6 border-b px-4 md:flex">
         <Skeleton className="h-3 w-20" />
         <Skeleton className="ml-auto h-3 w-12" />
         <Skeleton className="h-3 w-14" />
@@ -335,14 +352,14 @@ function TablaSkeleton() {
       {Array.from({ length: 5 }, (_, i) => (
         <div key={i} className="flex items-center gap-6 border-b px-4 py-3 last:border-0">
           <div className="grid flex-1 gap-1.5">
-            <Skeleton className="h-4 w-2/5" />
-            <Skeleton className="h-3 w-3/5" />
+            <Skeleton className="h-4 w-3/5 md:w-2/5" />
+            <Skeleton className="h-3 w-4/5 md:w-3/5" />
             <Skeleton className="h-3 w-24" />
           </div>
-          <Skeleton className="h-4 w-16" />
+          <Skeleton className="hidden h-4 w-16 md:block" />
           <Skeleton className="h-5 w-20 rounded-full" />
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-4 w-20" />
+          <Skeleton className="hidden h-4 w-20 md:block" />
+          <Skeleton className="hidden h-4 w-20 md:block" />
         </div>
       ))}
     </Card>

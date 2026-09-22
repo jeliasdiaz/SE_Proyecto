@@ -24,16 +24,13 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <CardContent>
         <FormularioLogin next={typeof next === "string" ? next : ""} aviso={aviso} />
       </CardContent>
-      <CardFooter className="flex-col items-start gap-1 border-t pt-4 text-sm text-muted-foreground">
+      <CardFooter className="border-t pt-4 text-sm text-muted-foreground">
         <p>
           ¿No tienes cuenta?{" "}
           <Link href="/registro" className="font-medium text-foreground underline-offset-4 hover:underline">
             Regístrate
           </Link>
         </p>
-        <Link href="/recuperar" className="underline-offset-4 hover:underline">
-          Olvidé mi contraseña
-        </Link>
       </CardFooter>
     </Card>
   )
