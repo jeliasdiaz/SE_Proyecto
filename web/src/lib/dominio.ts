@@ -32,6 +32,14 @@ export function exigeObservacion(estado: Estado): boolean {
   return estado === "rechazada"
 }
 
+// Espejo de dias_recordatorio() en la base de datos: días sin cambios para considerar un caso
+// estancado (la vista solicitudes_estancadas y el recordatorio F3 usan el mismo umbral).
+export const DIAS_RECORDATORIO = 3
+
+export function estaAbierta(estado: Estado): boolean {
+  return TRANSICIONES[estado].length > 0
+}
+
 export const ETIQUETA_TIPO: Record<Tipo, string> = {
   homologacion: "Homologación",
   cancelacion_extemporanea: "Cancelación extemporánea",

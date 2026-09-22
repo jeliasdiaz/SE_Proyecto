@@ -244,13 +244,14 @@ otp_expiry = 3600
 # sender_name = "Admin"
 
 # Los enlaces apuntan a /auth/confirm del front (verifyOtp con token_hash).
+# El nombre del sistema en asuntos y plantillas repite NOMBRE_APP (web/src/lib/marca.ts).
 # En la nube hay que copiar estas plantillas en Authentication > Email Templates.
 [auth.email.template.confirmation]
-subject = "Confirma tu correo - Solicitudes UPB"
+subject = "Confirma tu correo - Gestión de Solicitudes"
 content_path = "./supabase/templates/confirmacion.html"
 
 [auth.email.template.recovery]
-subject = "Restablece tu contraseña - Solicitudes UPB"
+subject = "Restablece tu contraseña - Gestión de Solicitudes"
 content_path = "./supabase/templates/recuperacion.html"
 
 # Uncomment to customize notification email template

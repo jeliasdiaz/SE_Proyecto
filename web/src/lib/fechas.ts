@@ -29,6 +29,11 @@ export function tiempoRelativo(iso: string, ahora: Date = new Date()): string {
   return formatoRelativo.format(Math.round(horas / 24), "day")
 }
 
+// Días completos transcurridos; mismo cálculo que dias_sin_cambio en la vista solicitudes_estancadas.
+export function diasDesde(iso: string, ahora: Date = new Date()): number {
+  return Math.floor((ahora.getTime() - new Date(iso).getTime()) / 86_400_000)
+}
+
 // Duraciones de las métricas: horas si es menos de dos días, días con un decimal si no.
 export function formatearDuracion(horas: number | null): string {
   if (horas === null) return "—"

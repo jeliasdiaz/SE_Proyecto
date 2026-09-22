@@ -127,4 +127,119 @@
   html {
     @apply font-sans;
   }
+  /* Tailwind v4 quitó el cursor pointer de los botones; se restaura para todo lo clicable. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  select:not(:disabled),
+  summary,
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="file"]:not(:disabled)::file-selector-button {
+    cursor: pointer;
+  }
+}
+
+/* ---------- Transiciones entre vistas (React <ViewTransition>) ---------- */
+/* nav-forward / nav-back: deslizamiento según la dirección del enlace (Link transitionTypes).
+   slide-up / slide-down: el skeleton sale y el contenido entra (Suspense reveal). */
+
+:root {
+  --duracion-salida: 150ms;
+  --duracion-entrada: 210ms;
+  --duracion-movimiento: 400ms;
+}
+
+/* El overlay de la transición no debe tragarse los clics. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* El header queda fijo: es la referencia para entender que se movió el contenido. */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+::view-transition-old(.nav-forward) {
+  --desplazamiento: -60px;
+  animation:
+    var(--duracion-salida) ease-in both desvanecer reverse,
+    var(--duracion-movimiento) ease-in-out both deslizar-x reverse;
+}
+::view-transition-new(.nav-forward) {
+  --desplazamiento: 60px;
+  animation:
+    var(--duracion-entrada) ease-out var(--duracion-salida) both desvanecer,
+    var(--duracion-movimiento) ease-in-out both deslizar-x;
+}
+::view-transition-old(.nav-back) {
+  --desplazamiento: 60px;
+  animation:
+    var(--duracion-salida) ease-in both desvanecer reverse,
+    var(--duracion-movimiento) ease-in-out both deslizar-x reverse;
+}
+::view-transition-new(.nav-back) {
+  --desplazamiento: -60px;
+  animation:
+    var(--duracion-entrada) ease-out var(--duracion-salida) both desvanecer,
+    var(--duracion-movimiento) ease-in-out both deslizar-x;
+}
+
+::view-transition-old(.slide-down) {
+  animation:
+    var(--duracion-salida) ease-out both desvanecer reverse,
+    var(--duracion-salida) ease-out both deslizar-y reverse;
+}
+::view-transition-new(.slide-up) {
+  animation:
+    var(--duracion-entrada) ease-in var(--duracion-salida) both desvanecer,
+    var(--duracion-movimiento) ease-in both deslizar-y;
+}
+
+@keyframes desvanecer {
+  from {
+    filter: blur(3px);
+    opacity: 0;
+  }
+  to {
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+@keyframes deslizar-x {
+  from {
+    translate: var(--desplazamiento);
+  }
+  to {
+    translate: 0;
+  }
+}
+@keyframes deslizar-y {
+  from {
+    transform: translateY(10px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Movimiento reducido: sin transiciones de vista ni animaciones de entrada (motion se apaga con
+   MotionConfig reducedMotion="user"). Los skeletons siguen pulsando: no desplazan nada. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+  [class*="animate-in"] {
+    animation: none !important;
+  }
 }

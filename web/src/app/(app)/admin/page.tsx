@@ -1,30 +1,36 @@
 import type { Metadata } from "next"
-import Form from "next/form"
 import Link from "next/link"
+import { Suspense, ViewTransition } from "react"
+import { ClockIcon, InboxIcon, ScanSearchIcon, XIcon } from "lucide-react"
 import { EstadoBadge } from "@/components/estado-badge"
+import { RevisionBadge } from "@/components/revision-badge"
+import { TransicionPagina } from "@/components/transicion-pagina"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
+  DIAS_RECORDATORIO,
   ESTADOS,
   ETIQUETA_ESTADO,
-  ETIQUETA_ORIGEN,
   ETIQUETA_TIPO,
-  ORIGENES,
-  TIPOS,
   esEstado,
   esOrigen,
   esTipo,
+  estaAbierta,
+  type Estado,
 } from "@/lib/dominio"
-import { formatearFecha, tiempoRelativo } from "@/lib/fechas"
+import { diasDesde, formatearFecha, tiempoRelativo } from "@/lib/fechas"
 import { createClient } from "@/lib/supabase/server"
+import { cn } from "@/lib/utils"
+import { FiltrosBandeja } from "./filtros-bandeja"
+import { PestanasEstado, type Pestana } from "./pestanas-estado"
 
 export const metadata: Metadata = { title: "Bandeja de solicitudes" }
 
 const POR_PAGINA = 20
+const LARGO_EXTRACTO = 140
 
 type Parametros = Awaited<PageProps<"/admin">["searchParams"]>
 
@@ -63,36 +69,56 @@ function enlaceConFiltros(filtros: Filtros, cambios: Partial<Filtros>): string {
   return cadena ? `/admin?${cadena}` : "/admin"
 }
 
+// Lo mínimo que se necesita de una consulta de PostgREST para filtrarla.
+type Filtrable<T> = {
+  eq(columna: "estado" | "tipo" | "origen" | "revision", valor: string): T
+  or(filtros: string): T
+}
+
+// Mismos filtros para la tabla y para los conteos. `omitir` deja fuera el filtro que el conteo
+// desglosa: las pestañas cuentan por estado respetando la búsqueda, el tipo, el origen y la revisión.
+function aplicarFiltros<T extends Filtrable<T>>(consulta: T, filtros: Filtros, omitir?: "estado" | "revision"): T {
+  let c = consulta
+  if (filtros.estado && omitir !== "estado") c = c.eq("estado", filtros.estado)
+  if (filtros.tipo) c = c.eq("tipo", filtros.tipo)
+  if (filtros.origen) c = c.eq("origen", filtros.origen)
+  if (filtros.porRevisar && omitir !== "revision") c = c.eq("revision", "por_revisar")
+  if (filtros.q) c = c.or(`asunto.ilike.%${filtros.q}%,descripcion.ilike.%${filtros.q}%`)
+  return c
+}
+
 export default async function BandejaPage({ searchParams }: PageProps<"/admin">) {
   const filtros = leerFiltros(await searchParams)
   const supabase = await createClient()
 
-  let consulta = supabase
-    .from("solicitudes")
-    .select(
-      "id, asunto, tipo, estado, origen, revision, creada, actualizada, estudiante:perfiles!solicitudes_estudiante_id_fkey(nombre)",
-      { count: "exact" }
-    )
-  if (filtros.estado) consulta = consulta.eq("estado", filtros.estado)
-  if (filtros.tipo) consulta = consulta.eq("tipo", filtros.tipo)
-  if (filtros.origen) consulta = consulta.eq("origen", filtros.origen)
-  if (filtros.porRevisar) consulta = consulta.eq("revision", "por_revisar")
-  if (filtros.q) consulta = consulta.or(`asunto.ilike.%${filtros.q}%,descripcion.ilike.%${filtros.q}%`)
-
-  const desde = (filtros.pagina - 1) * POR_PAGINA
-  const [{ data: solicitudes, count, error }, { count: porRevisar }] = await Promise.all([
-    consulta.order("creada", { ascending: false }).range(desde, desde + POR_PAGINA - 1),
-    supabase.from("solicitudes").select("id", { count: "exact", head: true }).eq("revision", "por_revisar"),
+  const conteo = () => supabase.from("solicitudes").select("id", { count: "exact", head: true })
+  const [porEstado, revision] = await Promise.all([
+    Promise.all(ESTADOS.map((estado) => aplicarFiltros(conteo(), filtros, "estado").eq("estado", estado))),
+    aplicarFiltros(conteo(), filtros, "revision").eq("revision", "por_revisar"),
   ])
-  if (error) throw error
+  const fallo = [...porEstado, revision].find((r) => r.error)?.error
+  if (fallo) throw fallo
 
-  const total = count ?? 0
+  const conteos = Object.fromEntries(ESTADOS.map((e, i) => [e, porEstado[i].count ?? 0])) as Record<Estado, number>
+  const todas = ESTADOS.reduce((suma, e) => suma + conteos[e], 0)
+  const total = filtros.estado ? conteos[filtros.estado] : todas
+  const porRevisar = revision.count ?? 0
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA))
   const hayFiltros = Boolean(filtros.estado || filtros.tipo || filtros.origen || filtros.porRevisar || filtros.q)
 
+  const pestanas: Pestana[] = [
+    { clave: "todas", etiqueta: "Todas", conteo: todas, href: enlaceConFiltros(filtros, { estado: undefined, pagina: 1 }) },
+    ...ESTADOS.map((estado) => ({
+      clave: estado,
+      etiqueta: ETIQUETA_ESTADO[estado],
+      conteo: conteos[estado],
+      href: enlaceConFiltros(filtros, { estado, pagina: 1 }),
+    })),
+  ]
+
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <TransicionPagina>
+      <div className="grid gap-5">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Bandeja de solicitudes</h1>
           <p className="text-sm text-muted-foreground">
@@ -100,151 +126,225 @@ export default async function BandejaPage({ searchParams }: PageProps<"/admin">)
             {hayFiltros && " con los filtros aplicados"}
           </p>
         </div>
-        {Boolean(porRevisar) && !filtros.porRevisar && (
-          <Button asChild variant="outline">
-            <Link href={enlaceConFiltros(filtros, { porRevisar: true, pagina: 1 })}>
-              Por revisar
-              <Badge className="bg-amber-500 text-white">{porRevisar}</Badge>
-            </Link>
-          </Button>
-        )}
-      </div>
 
-      <Card size="sm">
-        <CardContent>
-          {/* key: al cambiar los filtros por un enlace, el formulario se vuelve a montar con los valores nuevos. */}
-          <Form key={enlaceConFiltros(filtros, { pagina: 1 })} action="/admin" className="flex flex-wrap items-end gap-3">
-            <div className="grid min-w-56 flex-1 gap-1.5">
-              <label htmlFor="q" className="text-xs font-medium text-muted-foreground">
-                Buscar en asunto o descripción
-              </label>
-              <Input id="q" name="q" defaultValue={filtros.q} placeholder="Ej.: homologación cálculo" />
-            </div>
-            <FiltroSelect id="estado" etiqueta="Estado" valor={filtros.estado}>
-              {ESTADOS.map((e) => (
-                <NativeSelectOption key={e} value={e}>
-                  {ETIQUETA_ESTADO[e]}
-                </NativeSelectOption>
-              ))}
-            </FiltroSelect>
-            <FiltroSelect id="tipo" etiqueta="Tipo" valor={filtros.tipo}>
-              {TIPOS.map((t) => (
-                <NativeSelectOption key={t} value={t}>
-                  {ETIQUETA_TIPO[t]}
-                </NativeSelectOption>
-              ))}
-            </FiltroSelect>
-            <FiltroSelect id="origen" etiqueta="Origen" valor={filtros.origen}>
-              {ORIGENES.map((o) => (
-                <NativeSelectOption key={o} value={o}>
-                  {ETIQUETA_ORIGEN[o]}
-                </NativeSelectOption>
-              ))}
-            </FiltroSelect>
-            <FiltroSelect id="revision" etiqueta="Revisión" valor={filtros.porRevisar ? "por_revisar" : undefined}>
-              <NativeSelectOption value="por_revisar">Por revisar</NativeSelectOption>
-            </FiltroSelect>
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b">
+            <PestanasEstado pestanas={pestanas} activa={filtros.estado ?? "todas"} />
+            {(porRevisar > 0 || filtros.porRevisar) && (
+              <Link
+                href={enlaceConFiltros(filtros, { porRevisar: !filtros.porRevisar, pagina: 1 })}
+                scroll={false}
+                className={cn(
+                  "mb-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  filtros.porRevisar
+                    ? "border-violet-300 bg-violet-100 text-violet-900 hover:bg-violet-200"
+                    : "border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100"
+                )}
+              >
+                <ScanSearchIcon className="size-3.5" aria-hidden />
+                Por revisar
+                <span className="tabular-nums">{porRevisar}</span>
+                {filtros.porRevisar && (
+                  <>
+                    <XIcon className="size-3.5" aria-hidden />
+                    <span className="sr-only">(quitar filtro)</span>
+                  </>
+                )}
+              </Link>
+            )}
+          </div>
+          <FiltrosBandeja
+            q={filtros.q}
+            tipo={filtros.tipo}
+            origen={filtros.origen}
+            estado={filtros.estado}
+            porRevisar={filtros.porRevisar}
+            hayFiltros={hayFiltros}
+          />
+        </div>
+
+        {/* key: cada combinación de filtros es un límite nuevo, así se ve el skeleton mientras llega la tabla. */}
+        <Suspense
+          key={enlaceConFiltros(filtros, {})}
+          fallback={
+            <ViewTransition exit="slide-down" default="none">
+              <TablaSkeleton />
+            </ViewTransition>
+          }
+        >
+          <ViewTransition enter="slide-up" default="none">
+            <TablaSolicitudes filtros={filtros} hayFiltros={hayFiltros} />
+          </ViewTransition>
+        </Suspense>
+
+        {paginas > 1 && (
+          <nav className="flex items-center justify-between text-sm" aria-label="Paginación">
+            <span className="text-muted-foreground">
+              Página {filtros.pagina} de {paginas}
+            </span>
             <div className="flex gap-2">
-              <Button type="submit">Filtrar</Button>
-              {hayFiltros && (
-                <Button asChild variant="ghost">
-                  <Link href="/admin">Limpiar</Link>
+              {filtros.pagina > 1 && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={enlaceConFiltros(filtros, { pagina: filtros.pagina - 1 })}>Anterior</Link>
+                </Button>
+              )}
+              {filtros.pagina < paginas && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={enlaceConFiltros(filtros, { pagina: filtros.pagina + 1 })}>Siguiente</Link>
                 </Button>
               )}
             </div>
-          </Form>
-        </CardContent>
-      </Card>
-
-      {solicitudes.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            {hayFiltros ? "Ninguna solicitud coincide con los filtros." : "Todavía no hay solicitudes."}
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="py-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-4">Solicitud</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Registrada</TableHead>
-                <TableHead className="pr-4">Último cambio</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {solicitudes.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="max-w-96 pl-4">
-                    <Link href={`/admin/solicitudes/${s.id}`} className="block truncate font-medium hover:underline">
-                      {s.asunto}
-                    </Link>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                      <span>{s.estudiante?.nombre}</span>
-                      {s.origen === "correo" && <Badge variant="secondary">Correo</Badge>}
-                      {s.revision === "por_revisar" && (
-                        <Badge className="border-amber-200 bg-amber-100 text-amber-900">Por revisar</Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{ETIQUETA_TIPO[s.tipo]}</TableCell>
-                  <TableCell>
-                    <EstadoBadge estado={s.estado} />
-                  </TableCell>
-                  <TableCell>{formatearFecha(s.creada)}</TableCell>
-                  <TableCell className="pr-4 text-muted-foreground">{tiempoRelativo(s.actualizada)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
-
-      {paginas > 1 && (
-        <nav className="flex items-center justify-between text-sm" aria-label="Paginación">
-          <span className="text-muted-foreground">
-            Página {filtros.pagina} de {paginas}
-          </span>
-          <div className="flex gap-2">
-            {filtros.pagina > 1 && (
-              <Button asChild variant="outline" size="sm">
-                <Link href={enlaceConFiltros(filtros, { pagina: filtros.pagina - 1 })}>Anterior</Link>
-              </Button>
-            )}
-            {filtros.pagina < paginas && (
-              <Button asChild variant="outline" size="sm">
-                <Link href={enlaceConFiltros(filtros, { pagina: filtros.pagina + 1 })}>Siguiente</Link>
-              </Button>
-            )}
-          </div>
-        </nav>
-      )}
-    </div>
+          </nav>
+        )}
+      </div>
+    </TransicionPagina>
   )
 }
 
-function FiltroSelect({
-  id,
-  etiqueta,
-  valor,
-  children,
-}: {
-  id: string
-  etiqueta: string
-  valor?: string
-  children: React.ReactNode
-}) {
+async function TablaSolicitudes({ filtros, hayFiltros }: { filtros: Filtros; hayFiltros: boolean }) {
+  const supabase = await createClient()
+  const desde = (filtros.pagina - 1) * POR_PAGINA
+  const { data: solicitudes, error } = await aplicarFiltros(
+    supabase
+      .from("solicitudes")
+      .select(
+        "id, asunto, descripcion, tipo, estado, origen, revision, motivo_revision, creada, actualizada, estudiante:perfiles!solicitudes_estudiante_id_fkey(nombre)"
+      ),
+    filtros
+  )
+    .order("creada", { ascending: false })
+    .range(desde, desde + POR_PAGINA - 1)
+  if (error) throw error
+
+  if (solicitudes.length === 0) {
+    return (
+      <Card>
+        <CardContent className="grid justify-items-center gap-3 py-12 text-center">
+          <span className="grid size-10 place-items-center rounded-full bg-muted text-muted-foreground">
+            <InboxIcon className="size-5" />
+          </span>
+          <p className="text-sm text-muted-foreground">
+            {hayFiltros ? "Ninguna solicitud coincide con los filtros." : "Todavía no hay solicitudes."}
+          </p>
+          {hayFiltros && (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin" scroll={false}>
+                Limpiar filtros
+              </Link>
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const ahora = new Date()
+
   return (
-    <div className="grid gap-1.5">
-      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
-        {etiqueta}
-      </label>
-      <NativeSelect id={id} name={id} defaultValue={valor ?? ""} className="min-w-40">
-        <NativeSelectOption value="">Todos</NativeSelectOption>
-        {children}
-      </NativeSelect>
-    </div>
+    <Card className="py-0">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="pl-4">Solicitud</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Registrada</TableHead>
+            <TableHead className="pr-4">Último cambio</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {solicitudes.map((s, i) => (
+            <TableRow
+              key={s.id}
+              className="relative animate-in duration-300 fill-mode-both fade-in slide-in-from-bottom-1"
+              style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+            >
+              <TableCell className="pl-4">
+                {/* Enlace estirado: el ::after cubre toda la fila, pero sigue siendo un <a> real. */}
+                <Link
+                  href={`/admin/solicitudes/${s.id}`}
+                  transitionTypes={["nav-forward"]}
+                  className="block max-w-md truncate font-medium outline-none after:absolute after:inset-0 hover:underline focus-visible:after:ring-2 focus-visible:after:ring-ring/50 focus-visible:after:ring-inset"
+                >
+                  {s.asunto}
+                </Link>
+                <p className="max-w-md truncate text-xs text-muted-foreground">{extracto(s.descripcion)}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>{s.estudiante?.nombre}</span>
+                  {s.origen === "correo" && <Badge variant="secondary">Correo</Badge>}
+                  {s.revision === "por_revisar" && (
+                    // Por encima del enlace estirado para que el motivo se vea al pasar el cursor.
+                    <RevisionBadge motivo={s.motivo_revision} className="relative z-10" />
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>{ETIQUETA_TIPO[s.tipo]}</TableCell>
+              <TableCell>
+                <EstadoBadge estado={s.estado} />
+              </TableCell>
+              <TableCell>
+                <time dateTime={s.creada}>{formatearFecha(s.creada)}</time>
+              </TableCell>
+              <TableCell className="pr-4">
+                <UltimoCambio estado={s.estado} actualizada={s.actualizada} ahora={ahora} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  )
+}
+
+function extracto(descripcion: string): string {
+  const plano = descripcion.replace(/\s+/g, " ").trim()
+  return plano.length > LARGO_EXTRACTO ? `${plano.slice(0, LARGO_EXTRACTO).trimEnd()}…` : plano
+}
+
+// Casos abiertos sin movimiento: ámbar desde el umbral del recordatorio, rosa desde el doble.
+function UltimoCambio({ estado, actualizada, ahora }: { estado: Estado; actualizada: string; ahora: Date }) {
+  const dias = diasDesde(actualizada, ahora)
+  const nivel =
+    !estaAbierta(estado) || dias < DIAS_RECORDATORIO ? null : dias >= DIAS_RECORDATORIO * 2 ? "critico" : "alerta"
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1",
+        nivel === null && "text-muted-foreground",
+        nivel === "alerta" && "font-medium text-amber-700",
+        nivel === "critico" && "font-medium text-rose-700"
+      )}
+    >
+      {nivel && <ClockIcon className="size-3.5" aria-hidden />}
+      <time dateTime={actualizada}>{tiempoRelativo(actualizada, ahora)}</time>
+      {nivel && <span className="sr-only">, sin movimiento</span>}
+    </span>
+  )
+}
+
+function TablaSkeleton() {
+  return (
+    <Card className="gap-0 py-0" aria-busy aria-label="Cargando solicitudes">
+      <div className="flex h-10 items-center gap-6 border-b px-4">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="ml-auto h-3 w-12" />
+        <Skeleton className="h-3 w-14" />
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+      {Array.from({ length: 5 }, (_, i) => (
+        <div key={i} className="flex items-center gap-6 border-b px-4 py-3 last:border-0">
+          <div className="grid flex-1 gap-1.5">
+            <Skeleton className="h-4 w-2/5" />
+            <Skeleton className="h-3 w-3/5" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-5 w-20 rounded-full" />
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+      ))}
+    </Card>
   )
 }
