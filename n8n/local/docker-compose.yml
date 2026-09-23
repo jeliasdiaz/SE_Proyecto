@@ -1,0 +1,58 @@
+# Entorno local de n8n para desarrollar F1–F4 contra el Supabase local.
+# Requiere Supabase corriendo (`npx supabase start` desde la raíz del repo): n8n se une a su red
+# para hablar con la API (kong) y con Mailpit (el SMTP de pruebas de Supabase).
+name: se-n8n
+
+services:
+  n8n:
+    # Versión fija: debe coincidir con la de Azure (#8) para que los JSON exportados se importen igual.
+    image: docker.n8n.io/n8nio/n8n:2.41.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Falta N8N_ENCRYPTION_KEY en n8n/.env}
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_WEBHOOK_URL: http://localhost:5678/
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: ${ZONA_HORARIA:-America/Bogota}
+      TZ: ${ZONA_HORARIA:-America/Bogota}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      # Los flujos leen su configuración de despliegue con $env (en Azure se definen las mismas).
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      CORREO_REMITENTE: ${SMTP_REMITENTE:?Falta SMTP_REMITENTE en n8n/.env}
+    volumes:
+      - n8n_datos:/home/node/.n8n
+    networks:
+      - supabase
+    depends_on:
+      - greenmail
+
+  # Buzón IMAP falso del proyecto (#22, F4, #28). Los correos de prueba se le envían por SMTP (3025).
+  greenmail:
+    image: greenmail/standalone:2.1.14
+    restart: unless-stopped
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.smtp
+        -Dgreenmail.setup.test.imap
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users.login=email
+        -Dgreenmail.users=solicitudes:${BUZON_CLAVE:-solicitudes}@solicitudes.test
+    ports:
+      - "127.0.0.1:3025:3025"
+      - "127.0.0.1:3143:3143"
+    networks:
+      - supabase
+
+networks:
+  supabase:
+    name: supabase_network_SE_Proyecto
+    external: true
+
+volumes:
+  n8n_datos:

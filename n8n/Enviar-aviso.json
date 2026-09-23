@@ -1,0 +1,140 @@
+{
+  "id": "seEnviarAviso001",
+  "name": "Enviar-aviso",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Enviar-aviso (subflujo)\n**Propósito:** enviar un correo y dejar constancia en `avisos_enviados`, también si falla.\n\n**Entrada (un ítem por correo):** `destinatario`, `asunto`, `cuerpo` (HTML), `tipo_aviso`, `solicitud_id` (o null).\n\n**Lo usan:** F1, F2. F3 y F4 (de Santiago) pueden llamarlo si él lo acuerda; solo el dueño lo edita.\n\n**Dueño:** Abel\n**Fecha:** 2026-09-23",
+        "height": 320,
+        "width": 360,
+        "color": 7
+      },
+      "id": "nota-proposito",
+      "name": "Propósito",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "recibir-aviso",
+      "name": "Recibir aviso",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.CORREO_REMITENTE }}",
+        "toEmail": "={{ $json.destinatario }}",
+        "subject": "={{ $json.asunto }}",
+        "emailFormat": "html",
+        "html": "={{ $json.cuerpo }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "enviar-correo",
+      "name": "Enviar correo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "seSmtpLocal00001",
+          "name": "SMTP local (Mailpit)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Un registro en avisos_enviados por cada correo, se haya enviado o no (R4: reprocesar fallidos).\nconst avisos = $('Recibir aviso').all();\n\nreturn $input.all().map((item, i) => {\n  const aviso = avisos[i].json;\n  const error = item.json.error;\n  return {\n    json: {\n      solicitud_id: aviso.solicitud_id ?? null,\n      tipo_aviso: aviso.tipo_aviso,\n      destinatario: aviso.destinatario,\n      resultado: error ? 'fallida' : 'enviada',\n      detalle: error ? String(error.message ?? error).slice(0, 500) : null,\n    },\n  };\n});\n"
+      },
+      "id": "preparar-registro",
+      "name": "Preparar registro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "avisos_enviados",
+        "dataToSend": "autoMapInputData"
+      },
+      "id": "registrar-aviso",
+      "name": "Registrar aviso",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "seSupabaseLocal1",
+          "name": "Supabase local"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Recibir aviso": {
+      "main": [
+        [
+          {
+            "node": "Enviar correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar correo": {
+      "main": [
+        [
+          {
+            "node": "Preparar registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar registro": {
+      "main": [
+        [
+          {
+            "node": "Registrar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [],
+  "active": false,
+  "pinData": {}
+}

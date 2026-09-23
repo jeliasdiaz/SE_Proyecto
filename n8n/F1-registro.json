@@ -1,0 +1,216 @@
+{
+  "id": "seF1Registro0001",
+  "name": "F1-registro",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## F1-registro — Confirmación de registro (#19)\n**Propósito:** cuando se crea una solicitud (web o F4), confirmar al estudiante y avisar a todos los administradores.\n\n**Disparador:** Database Webhook de Supabase, INSERT en `solicitudes` → `POST /webhook/f1-registro` con el encabezado secreto.\n\n**Avisos:** `registro_estudiante`, `registro_admin` (vía subflujo *Enviar aviso*).\n\n**Dueño:** Abel\n**Fecha:** 2026-09-23",
+        "height": 340,
+        "width": 360,
+        "color": 7
+      },
+      "id": "nota-proposito",
+      "name": "Propósito",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f1-registro",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-insert",
+      "name": "Webhook INSERT",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "seWebhookSecret1",
+          "name": "Webhook Supabase (encabezado secreto)"
+        }
+      },
+      "webhookId": "6f1d7c2e-3b0a-4f6e-9a51-f1e5a0b7c001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Payload de los Database Webhooks de Supabase: { type, table, schema, record, old_record }.\n// Cualquier otra cosa se ignora sin error.\nconst { type, table, record } = $input.first().json.body ?? {};\nif (type !== 'INSERT' || table !== 'solicitudes' || !record?.id || !record?.estudiante_id) {\n  return [];\n}\nreturn [{ json: record }];\n"
+      },
+      "id": "leer-solicitud",
+      "name": "Leer solicitud",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "perfiles",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "=id=eq.{{ $json.estudiante_id }}"
+      },
+      "id": "buscar-estudiante",
+      "name": "Buscar estudiante",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "seSupabaseLocal1",
+          "name": "Supabase local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "perfiles",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "rol=eq.admin"
+      },
+      "id": "buscar-admins",
+      "name": "Buscar admins",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "seSupabaseLocal1",
+          "name": "Supabase local"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const solicitud = $('Leer solicitud').first().json;\nconst estudiante = $('Buscar estudiante').first().json;\nconst admins = $('Buscar admins').all().map((item) => item.json).filter((admin) => admin.correo);\nconst app = $env.APP_URL.replace(/\\/$/, '');\n\n// Espejo de ETIQUETA_TIPO (web/src/lib/dominio.ts).\nconst TIPOS = {\n  homologacion: 'Homologación',\n  cancelacion_extemporanea: 'Cancelación extemporánea',\n  supletorio: 'Supletorio',\n  reingreso: 'Reingreso',\n  comite_curricular: 'Solicitud al comité curricular',\n  otro: 'Otro',\n};\nconst ORIGENES = { web: 'la web', correo: 'correo electrónico' };\n\n// El asunto y la descripción los escribe el estudiante: nunca van al HTML sin escapar.\nconst esc = (texto) => String(texto ?? '').replace(/[&<>\"']/g, (c) =>\n  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]);\n\nconst tipo = TIPOS[solicitud.tipo] ?? solicitud.tipo;\nconst fecha = new Date(solicitud.creada).toLocaleString('es-CO', {\n  timeZone: 'America/Bogota', dateStyle: 'long', timeStyle: 'short',\n});\nconst resumen = `\n<ul>\n  <li><strong>Tipo:</strong> ${esc(tipo)}</li>\n  <li><strong>Asunto:</strong> ${esc(solicitud.asunto)}</li>\n  <li><strong>Recibida:</strong> ${esc(fecha)} por ${ORIGENES[solicitud.origen] ?? esc(solicitud.origen)}</li>\n</ul>`;\n\nconst avisos = [{\n  solicitud_id: solicitud.id,\n  tipo_aviso: 'registro_estudiante',\n  destinatario: estudiante.correo,\n  asunto: `Recibimos tu solicitud: ${solicitud.asunto} - Gestión de Solicitudes`,\n  cuerpo: `<h2>Recibimos tu solicitud</h2>\n<p>Hola ${esc(estudiante.nombre)},</p>\n<p>Tu solicitud quedó registrada como <strong>Pendiente</strong>. Te escribiremos cada vez que cambie de estado.</p>\n${resumen}\n<p><a href=\"${app}/mis-solicitudes/${solicitud.id}\">Ver mi solicitud</a></p>`,\n}];\n\nconst porRevisar = solicitud.revision === 'por_revisar'\n  ? `<p><strong>Requiere revisión:</strong> ${esc(solicitud.motivo_revision ?? 'no se pudo clasificar automáticamente')}.</p>`\n  : '';\n\nfor (const admin of admins) {\n  avisos.push({\n    solicitud_id: solicitud.id,\n    tipo_aviso: 'registro_admin',\n    destinatario: admin.correo,\n    asunto: `Nueva solicitud: ${tipo} - Gestión de Solicitudes`,\n    cuerpo: `<h2>Nueva solicitud</h2>\n<p>${esc(estudiante.nombre)}${estudiante.id_estudiantil ? ` (ID ${esc(estudiante.id_estudiantil)})` : ''} registró una solicitud.</p>\n${resumen}\n${porRevisar}\n<p><a href=\"${app}/admin/solicitudes/${solicitud.id}\">Gestionar la solicitud</a></p>`,\n  });\n}\n\nreturn avisos.map((json) => ({ json }));\n"
+      },
+      "id": "armar-avisos",
+      "name": "Armar avisos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "seEnviarAviso001",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "enviar-avisos",
+      "name": "Enviar avisos",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook INSERT": {
+      "main": [
+        [
+          {
+            "node": "Leer solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer solicitud": {
+      "main": [
+        [
+          {
+            "node": "Buscar estudiante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar estudiante": {
+      "main": [
+        [
+          {
+            "node": "Buscar admins",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar admins": {
+      "main": [
+        [
+          {
+            "node": "Armar avisos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar avisos": {
+      "main": [
+        [
+          {
+            "node": "Enviar avisos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [],
+  "active": false,
+  "pinData": {}
+}
