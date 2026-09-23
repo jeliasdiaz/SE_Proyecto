@@ -45,14 +45,14 @@
 | 15 | Implementar filtros de solicitudes | José | M2 |
 | 16 | Implementar gestión de estados y observaciones | José | M1 |
 | 17 | Implementar historial de solicitudes | José | M2 |
-| 18 | Configurar credenciales de Supabase y SMTP | Abel | M1 |
+| 18 | Configurar credenciales de Supabase y SMTP | David | M1 |
 | 19 | Implementar F1 — Confirmación de registro | Abel | M1 |
 | 20 | Implementar F2 — Cambio de estado | Abel | M2 |
 | 21 | Implementar F3 — Recordatorio de solicitudes | Santiago | M2 |
 | 22 | Configurar lectura de correos mediante IMAP | Santiago | M1 |
 | 23 | Implementar F4 — Correo a caso | Santiago | M2 |
 | 24 | Integrar frontend con Supabase | Miguel + José | M2 |
-| 25 | Integrar Supabase con n8n | David + Abel | M2 |
+| 25 | Integrar Supabase con n8n | David | M2 |
 | 26 | Primera integración React → Supabase → n8n | Todos | M1 |
 | 27 | Ejecutar recorrido completo del MVP | Todos | M3 |
 | 28 | Prueba de correo ambiguo y remitente desconocido | Santiago + Abel | M3 |
@@ -472,7 +472,7 @@ Mostrar a administrador y estudiante la trazabilidad de cambios de una solicitud
 
 ## 18. Configurar credenciales de Supabase y SMTP
 
-**Responsable:** Abel · **Prioridad:** 🔴 Alta · **Label:** `n8n` · **Milestone:** M1 - Avance jueves
+**Responsable:** David · **Prioridad:** 🔴 Alta · **Label:** `n8n` · **Milestone:** M1 - Avance jueves
 
 ### Descripción
 Configurar en n8n las credenciales para Supabase y el envío de correos.
@@ -642,7 +642,7 @@ Conectar las interfaces del portal con Supabase para completar el flujo de creac
 
 ## 25. Integrar Supabase con n8n
 
-**Responsables:** David + Abel · **Prioridad:** 🔴 Alta · **Label:** `integration` · **Milestone:** M2 - MVP
+**Responsable:** David · **Prioridad:** 🔴 Alta · **Label:** `integration` · **Milestone:** M2 - MVP
 
 ### Descripción
 Conectar los eventos de Supabase con los workflows de n8n.
