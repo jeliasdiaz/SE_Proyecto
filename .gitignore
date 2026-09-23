@@ -1,0 +1,42 @@
+# Reglas globales del repositorio. Cada subproyecto (web/, supabase/) tiene
+# además su propio .gitignore con reglas específicas.
+
+# Variables de entorno y secretos: nunca se suben.
+# Solo se versionan las plantillas .env.example (sin valores reales).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+id_rsa*
+id_ed25519*
+
+# Dependencias y compilados
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Datos locales de n8n y Docker (contienen credenciales cifradas y ejecuciones)
+.n8n/
+n8n_data/
+infra/data/
+infra/backups/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Configuración local de Claude Code
+.claude/settings.local.json
