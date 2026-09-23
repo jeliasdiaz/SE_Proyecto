@@ -2,6 +2,13 @@ import { EstadoBadge } from "@/components/estado-badge"
 import type { Estado } from "@/lib/dominio"
 import { formatearFechaHora } from "@/lib/fechas"
 
+const PUNTO_ESTADO: Record<Estado, string> = {
+  pendiente: "bg-amber-500",
+  en_proceso: "bg-sky-600",
+  finalizada: "bg-emerald-600",
+  rechazada: "bg-rose-600",
+}
+
 export type EventoHistorial = {
   id: number
   estadoAnterior: Estado | null
@@ -20,7 +27,9 @@ export function HistorialTimeline({ eventos }: { eventos: EventoHistorial[] }) {
     <ol className="relative grid gap-5 border-l pl-5">
       {eventos.map((evento) => (
         <li key={evento.id} className="relative grid gap-1">
-          <span className="absolute top-1.5 -left-[25px] size-2.5 rounded-full border-2 border-background bg-foreground/60" />
+          <span
+            className={`absolute top-1.5 -left-[25px] size-2.5 rounded-full border-2 border-background ${PUNTO_ESTADO[evento.estadoNuevo]}`}
+          />
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {evento.estadoAnterior === null ? (
               <span className="font-medium">Solicitud registrada</span>
