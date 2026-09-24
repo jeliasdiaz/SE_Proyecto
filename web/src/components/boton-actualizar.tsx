@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 // Vuelve a pedir los datos de la página sin recargarla. Los estados cambian desde otra sesión
-// (el admin) o desde n8n, y la interfaz no escucha cambios en tiempo real.
+// (la coordinación) o desde n8n. En la bandeja es el respaldo de RefrescoEnVivo.
 // En móvil queda solo el ícono (el texto sigue disponible para lectores de pantalla).
 export function BotonActualizar({ className }: { className?: string }) {
   const router = useRouter()

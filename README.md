@@ -1,6 +1,6 @@
 # Sistema Inteligente de Gestión de Solicitudes Universitarias
 
-Aplicación web para registrar y hacer seguimiento a trámites académicos de excepción (homologaciones, cancelaciones extemporáneas, supletorios, reingresos, solicitudes a comités). El estudiante registra su solicitud y consulta su avance; el administrador la gestiona y cada cambio de estado queda en el historial. n8n envía los avisos y convierte en casos las solicitudes que llegan por correo.
+Aplicación web para registrar y hacer seguimiento a trámites académicos de excepción (homologaciones, cancelaciones extemporáneas, supletorios, reingresos, solicitudes a comités). El estudiante registra su solicitud y consulta su avance; un asesor la toma y la gestiona, el administrador supervisa a los asesores, y cada cambio de estado queda en el historial. n8n envía los avisos y convierte en casos las solicitudes que llegan por correo.
 
 Proyecto del curso Sistemas Empresariales (UPB).
 
@@ -15,6 +15,16 @@ Proyecto del curso Sistemas Empresariales (UPB).
 | [`docs/`](docs/) | Propuesta, plan, diagramas y evidencias del proyecto. |
 
 Cada carpeta tiene su propio README con más detalle.
+
+## Roles
+
+| Rol | Entra a | Puede |
+|---|---|---|
+| Estudiante | `/mis-solicitudes` | Registrar solicitudes, seguir las suyas y retirar una pendiente. |
+| Asesor | `/gestion` | Ver todas las solicitudes, **tomar** una sin responsable y gestionar solo las suyas (estado, observación, clasificación). |
+| Administrador | `/admin` | Todo lo del asesor sobre cualquier caso, más: reasignar o liberar casos, reabrir uno finalizado o rechazado, ver la carga de cada asesor y las métricas, y dar o quitar el rol de asesor (`/admin/usuarios`). |
+
+Las reglas viven en la base de datos (RLS y el trigger `validar_cambio_solicitud`), no en la interfaz: dos asesores que toman el mismo caso a la vez compiten por el bloqueo de la fila y solo uno lo obtiene. El rol de administrador solo se asigna por SQL. `supabase/snippets/prueba-roles.sql` comprueba estas reglas contra la base local.
 
 ## Stack
 

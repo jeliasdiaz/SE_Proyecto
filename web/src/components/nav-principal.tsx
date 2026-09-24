@@ -3,7 +3,7 @@
 import Link, { useLinkStatus } from "next/link"
 import { usePathname } from "next/navigation"
 import { m } from "motion/react"
-import { ChartColumnIcon, FilePlusIcon, FilesIcon, InboxIcon } from "lucide-react"
+import { ChartColumnIcon, FilePlusIcon, FilesIcon, InboxIcon, UserCogIcon, UsersIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // El layout es server component: pasa el nombre del ícono, no el componente.
@@ -12,6 +12,8 @@ const ICONOS = {
   metricas: ChartColumnIcon,
   solicitudes: FilesIcon,
   nueva: FilePlusIcon,
+  asesores: UsersIcon,
+  usuarios: UserCogIcon,
 }
 
 export type Enlace = { href: string; etiqueta: string; icono: keyof typeof ICONOS }

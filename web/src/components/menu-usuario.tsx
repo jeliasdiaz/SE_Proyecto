@@ -12,10 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Spinner } from "@/components/ui/spinner"
-import type { Rol } from "@/lib/dominio"
+import { ETIQUETA_ROL, type Rol } from "@/lib/dominio"
 import { cerrarSesion } from "@/app/(auth)/actions"
-
-const ETIQUETA_ROL: Record<Rol, string> = { admin: "Administración", estudiante: "Estudiante" }
 
 function iniciales(nombre: string): string {
   return nombre

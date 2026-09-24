@@ -14,7 +14,7 @@ Fecha del plan: 17/09/2026 · Versión 2 (MVP hasta Tarea 1)
 **Solución.** Una aplicación web donde:
 
 - El estudiante inicia sesión, registra su solicitud (tipo, asunto, descripción, adjunto opcional) y consulta su avance. Mientras siga pendiente, puede retirarla.
-- El administrador revisa cada caso, cambia su estado (`Pendiente`, `En proceso`, `Finalizada`, `Rechazada`, `Retirada`) y agrega observaciones. Un desistimiento con el caso en proceso lo registra el administrador como `Retirada`, con observación.
+- Un asesor toma el caso (queda como responsable), cambia su estado (`Pendiente`, `En proceso`, `Finalizada`, `Rechazada`, `Retirada`) y agrega observaciones. Un desistimiento con el caso en proceso lo registra su responsable como `Retirada`, con observación. El administrador supervisa: ve la carga de cada asesor, reasigna casos, reabre uno cerrado y da o quita el rol de asesor.
 - Cada cambio queda en un historial: fecha, estado anterior, estado nuevo y responsable.
 - n8n automatiza los avisos y convierte las solicitudes que llegan por correo en casos.
 
@@ -184,12 +184,12 @@ Cada fase tiene **criterio de terminado**; sin cumplirlo no se pasa a la siguien
 ### Fase 3 — Base de datos en Supabase ⇄
 
 1. Tablas:
-   - `perfiles` (id del usuario, nombre, correo, rol: `estudiante` / `admin`, id estudiantil)
+   - `perfiles` (id del usuario, nombre, correo, rol: `estudiante` / `asesor` / `admin`, id estudiantil)
    - `solicitudes` (id, estudiante, tipo, asunto, descripción, adjunto, estado, observaciones, origen: `web` / `correo`, revisión: `ok` / `por_revisar`, responsable, creada, actualizada)
    - `historial_estados` (id, solicitud, estado anterior, estado nuevo, usuario, fecha)
    - `avisos_enviados` (id, solicitud, tipo de aviso, fecha) — evita duplicados y sirve de evidencia
 2. Trigger que inserte en `historial_estados` en cada cambio de estado.
-3. Políticas RLS: el estudiante ve solo lo suyo; el admin ve todo.
+3. Políticas RLS: el estudiante ve solo lo suyo; asesores y admin ven todo; el asesor solo modifica los casos libres o suyos; reasignar y reabrir son del admin.
 4. Bucket de adjuntos con políticas equivalentes.
 5. Llave `service_role` solo como credencial en n8n. **Nunca en el frontend.**
 6. Datos de prueba: 3 estudiantes, 1 admin, 10 solicitudes.

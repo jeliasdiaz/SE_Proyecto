@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
-import { ETIQUETA_ESTADO, TRANSICIONES, exigeObservacion, type Estado } from "@/lib/dominio"
+import { ETIQUETA_ESTADO, esReapertura, exigeObservacion, transicionesPara, type Estado, type Rol } from "@/lib/dominio"
 import type { EstadoFormulario } from "@/lib/validacion"
 import { cambiarEstado } from "./actions"
 
@@ -22,12 +22,14 @@ const ESTILO_PANEL: Record<Estado, string> = {
   retirada: "border-slate-200 bg-slate-50/70",
 }
 
-export function PanelGestion({ solicitudId, estadoActual }: { solicitudId: string; estadoActual: Estado }) {
+type Props = { solicitudId: string; estadoActual: Estado; rol: Rol }
+
+export function PanelGestion({ solicitudId, estadoActual, rol }: Props) {
   const [estado, enviar, enviando] = useActionState<EstadoFormulario, FormData>(
-    cambiarEstado.bind(null, solicitudId),
+    cambiarEstado.bind(null, solicitudId, estadoActual),
     {}
   )
-  const opciones = TRANSICIONES[estadoActual]
+  const opciones = transicionesPara(estadoActual, rol)
   const [destino, setDestino] = useState<Estado | "">("")
 
   if (opciones.length === 0) {
@@ -46,7 +48,9 @@ export function PanelGestion({ solicitudId, estadoActual }: { solicitudId: strin
     )
   }
 
-  const obligatoria = destino !== "" && exigeObservacion(destino)
+  const obligatoria = destino !== "" && exigeObservacion(estadoActual, destino)
+  const reabre = destino !== "" && esReapertura(estadoActual, destino)
+  const motivo = reabre ? "de la reapertura" : destino === "retirada" ? "del retiro" : "del rechazo"
 
   return (
     <form
@@ -77,7 +81,7 @@ export function PanelGestion({ solicitudId, estadoActual }: { solicitudId: strin
           </NativeSelectOption>
           {opciones.map((opcion) => (
             <NativeSelectOption key={opcion} value={opcion}>
-              {ETIQUETA_ESTADO[opcion]}
+              {esReapertura(estadoActual, opcion) ? `Reabrir (${ETIQUETA_ESTADO[opcion]})` : ETIQUETA_ESTADO[opcion]}
             </NativeSelectOption>
           ))}
         </NativeSelect>
@@ -91,7 +95,7 @@ export function PanelGestion({ solicitudId, estadoActual }: { solicitudId: strin
       )}
       <Campo
         id="observacion"
-        etiqueta={obligatoria ? `Motivo ${destino === "retirada" ? "del retiro" : "del rechazo"} (obligatorio)` : "Observación para el estudiante (opcional)"}
+        etiqueta={obligatoria ? `Motivo ${motivo} (obligatorio)` : "Observación para el estudiante (opcional)"}
         errores={estado.errores?.observacion}
         ayuda="La verá el estudiante y se incluye en el correo de aviso."
       >
@@ -108,7 +112,7 @@ export function PanelGestion({ solicitudId, estadoActual }: { solicitudId: strin
       </Campo>
       <Button type="submit" disabled={enviando || destino === ""}>
         {enviando && <Spinner data-icon="inline-start" />}
-        {enviando ? "Guardando…" : "Cambiar estado"}
+        {enviando ? "Guardando…" : reabre ? "Reabrir solicitud" : "Cambiar estado"}
       </Button>
     </form>
   )

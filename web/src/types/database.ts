@@ -232,6 +232,23 @@ export type Database = {
       }
     }
     Views: {
+      carga_por_asesor: {
+        Row: {
+          correo: string | null
+          en_proceso: number | null
+          estancadas: number | null
+          finalizadas: number | null
+          horas_resolucion: number | null
+          id: string | null
+          nombre: string | null
+          pendientes: number | null
+          rechazadas: number | null
+          retiradas: number | null
+          rol: Database["public"]["Enums"]["rol_usuario"] | null
+          ultima_actividad: string | null
+        }
+        Relationships: []
+      }
       metricas_por_estado: {
         Row: {
           estado: Database["public"]["Enums"]["estado_solicitud"] | null
@@ -290,13 +307,23 @@ export type Database = {
     }
     Functions: {
       dias_recordatorio: { Args: never; Returns: number }
+      cambiar_rol: {
+        Args: {
+          p_rol: Database["public"]["Enums"]["rol_usuario"]
+          p_usuario: string
+        }
+        Returns: undefined
+      }
       es_admin: { Args: never; Returns: boolean }
+      es_asesor: { Args: never; Returns: boolean }
+      es_personal: { Args: never; Returns: boolean }
+      puede_ser_responsable: { Args: { p_usuario: string }; Returns: boolean }
     }
     Enums: {
       estado_revision: "ok" | "por_revisar"
       estado_solicitud: "pendiente" | "en_proceso" | "finalizada" | "rechazada" | "retirada"
       origen_solicitud: "web" | "correo"
-      rol_usuario: "estudiante" | "admin"
+      rol_usuario: "estudiante" | "asesor" | "admin"
       tipo_solicitud:
         | "homologacion"
         | "cancelacion_extemporanea"
@@ -437,7 +464,7 @@ export const Constants = {
       estado_revision: ["ok", "por_revisar"],
       estado_solicitud: ["pendiente", "en_proceso", "finalizada", "rechazada", "retirada"],
       origen_solicitud: ["web", "correo"],
-      rol_usuario: ["estudiante", "admin"],
+      rol_usuario: ["estudiante", "asesor", "admin"],
       tipo_solicitud: [
         "homologacion",
         "cancelacion_extemporanea",

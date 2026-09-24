@@ -65,6 +65,16 @@ export const esquemaClasificacion = z.object({
   tipo: z.enum(TIPOS, "Elige el tipo de solicitud."),
 })
 
+// Vacío = dejar la solicitud sin responsable.
+export const esquemaReasignacion = z.object({
+  responsable: z.union([z.literal(""), z.uuid("Elige un responsable válido.")]),
+})
+
+export const esquemaCambioRol = z.object({
+  usuario: z.uuid(),
+  rol: z.enum(["estudiante", "asesor"], "Rol no válido."),
+})
+
 export type ErroresDeCampo = Record<string, string[] | undefined>
 
 export type EstadoFormulario = {

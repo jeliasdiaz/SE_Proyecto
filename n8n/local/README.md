@@ -87,7 +87,7 @@ junto con `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`:
 
 | Variable | Uso |
 |---|---|
-| `APP_URL` | Enlaces de los correos a `/mis-solicitudes/<id>` y `/admin/solicitudes/<id>` |
+| `APP_URL` | Enlaces de los correos a `/mis-solicitudes/<id>` y `/gestion/solicitudes/<id>` |
 | `CORREO_REMITENTE` | Remitente de todos los correos (en local sale de `SMTP_REMITENTE`) |
 
 ## Notas para los flujos

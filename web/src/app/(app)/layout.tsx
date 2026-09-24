@@ -3,19 +3,25 @@ import { Marca } from "@/components/marca"
 import { MenuUsuario } from "@/components/menu-usuario"
 import { NavInferior, NavPrincipal, type Enlace } from "@/components/nav-principal"
 import { requerirPerfil } from "@/lib/auth"
+import type { Rol } from "@/lib/dominio"
+
+const ENLACES: Record<Rol, Enlace[]> = {
+  estudiante: [
+    { href: "/mis-solicitudes", etiqueta: "Mis solicitudes", icono: "solicitudes" },
+    { href: "/mis-solicitudes/nueva", etiqueta: "Nueva solicitud", icono: "nueva" },
+  ],
+  asesor: [{ href: "/gestion", etiqueta: "Bandeja", icono: "bandeja" }],
+  admin: [
+    { href: "/admin", etiqueta: "Asesores", icono: "asesores" },
+    { href: "/gestion", etiqueta: "Bandeja", icono: "bandeja" },
+    { href: "/admin/metricas", etiqueta: "Métricas", icono: "metricas" },
+    { href: "/admin/usuarios", etiqueta: "Usuarios", icono: "usuarios" },
+  ],
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const perfil = await requerirPerfil()
-  const enlaces: Enlace[] =
-    perfil.rol === "admin"
-      ? [
-          { href: "/admin", etiqueta: "Bandeja", icono: "bandeja" },
-          { href: "/admin/metricas", etiqueta: "Métricas", icono: "metricas" },
-        ]
-      : [
-          { href: "/mis-solicitudes", etiqueta: "Mis solicitudes", icono: "solicitudes" },
-          { href: "/mis-solicitudes/nueva", etiqueta: "Nueva solicitud", icono: "nueva" },
-        ]
+  const enlaces = ENLACES[perfil.rol]
 
   return (
     <>

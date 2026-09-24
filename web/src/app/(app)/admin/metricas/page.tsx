@@ -31,7 +31,7 @@ const PLURAL_ESTADO: Record<Estado, string> = {
 
 export default async function MetricasPage() {
   const supabase = await createClient()
-  const [porEstado, tiempos, estancadas] = await Promise.all([
+  const [porEstado, tiempos, estancadas, carga] = await Promise.all([
     supabase.from("metricas_por_estado").select("estado, total"),
     supabase
       .from("metricas_tiempos_por_tipo")
@@ -40,10 +40,12 @@ export default async function MetricasPage() {
       .from("solicitudes_estancadas")
       .select("id, asunto, tipo, estado, dias_sin_cambio")
       .order("dias_sin_cambio", { ascending: false }),
+    supabase.from("carga_por_asesor").select("id, nombre, finalizadas, rechazadas, horas_resolucion").order("nombre"),
   ])
   if (porEstado.error) throw porEstado.error
   if (tiempos.error) throw tiempos.error
   if (estancadas.error) throw estancadas.error
+  if (carga.error) throw carga.error
   const casosEstancados = estancadas.data
 
   const conteos = Object.fromEntries(
@@ -64,6 +66,21 @@ export default async function MetricasPage() {
       texto: formatearDuracion(horas(t)),
       detalle: `${t.total} ${t.total === 1 ? "caso" : "casos"}, ${t.cerradas} ${t.cerradas === 1 ? "cerrado" : "cerrados"}`,
     }))
+
+  // Solo quien ya cerró algún caso: sin cierres no hay tiempo de resolución que comparar.
+  const porPersona: Fila[] = carga.data.flatMap((p) => {
+    const cerradas = (p.finalizadas ?? 0) + (p.rechazadas ?? 0)
+    if (!p.id || cerradas === 0) return []
+    return [
+      {
+        clave: p.id,
+        etiqueta: p.nombre ?? "Sin nombre",
+        valor: p.horas_resolucion,
+        texto: formatearDuracion(p.horas_resolucion),
+        detalle: `${cerradas} ${cerradas === 1 ? "caso cerrado" : "casos cerrados"}`,
+      },
+    ]
+  })
 
   return (
     <TransicionPagina>
@@ -169,6 +186,23 @@ export default async function MetricasPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Resolución por responsable</CardTitle>
+            <CardDescription>
+              Tiempo promedio desde el registro hasta el cierre de los casos que cada persona tiene a su cargo. La carga
+              actual está en <Link href="/admin" className="underline underline-offset-4 hover:text-foreground">Asesores</Link>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {porPersona.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Todavía nadie ha cerrado casos.</p>
+            ) : (
+              <BarrasHorizontales titulo="Resolución" filas={porPersona} />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Casos estancados ({casosEstancados.length})</CardTitle>
             <CardDescription>Abiertos y sin cambios desde hace {DIAS_RECORDATORIO} días o más.</CardDescription>
           </CardHeader>
@@ -182,7 +216,7 @@ export default async function MetricasPage() {
                   return (
                     <li key={caso.id}>
                       <Link
-                        href={`/admin/solicitudes/${caso.id}`}
+                        href={`/gestion/solicitudes/${caso.id}`}
                         transitionTypes={["nav-forward"]}
                         className="group flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-2 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
                       >

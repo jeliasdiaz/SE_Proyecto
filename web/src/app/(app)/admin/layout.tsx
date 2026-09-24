@@ -1,7 +1,7 @@
 import { requerirPerfil } from "@/lib/auth"
 
-// Defensa en profundidad: aunque un estudiante llegara aquí, RLS solo le devolvería sus filas
-// y rechazaría cualquier cambio.
+// Panel del admin: asesores, roles y métricas. Defensa en profundidad: las vistas filtran por
+// es_admin() y cambiar_rol() lo vuelve a comprobar, así que un asesor que llegara aquí vería vacío.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requerirPerfil("admin")
   return children
