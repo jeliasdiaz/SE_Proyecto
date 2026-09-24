@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { Suspense, ViewTransition } from "react"
 import { ClockIcon, InboxIcon, ScanSearchIcon, XIcon } from "lucide-react"
+import { BotonActualizar } from "@/components/boton-actualizar"
 import { EstadoBadge } from "@/components/estado-badge"
 import { RevisionBadge } from "@/components/revision-badge"
 import { TransicionPagina } from "@/components/transicion-pagina"
@@ -127,12 +128,15 @@ export default async function BandejaPage({ searchParams }: PageProps<"/admin">)
   return (
     <TransicionPagina>
       <div className="grid min-w-0 gap-5">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Bandeja de solicitudes</h1>
-          <p className="text-sm text-muted-foreground">
-            {total} {total === 1 ? "solicitud" : "solicitudes"}
-            {hayFiltros && " con los filtros aplicados"}
-          </p>
+        <div className="flex items-start justify-between gap-4 sm:items-end">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Bandeja de solicitudes</h1>
+            <p className="text-sm text-muted-foreground">
+              {total} {total === 1 ? "solicitud" : "solicitudes"}
+              {hayFiltros && " con los filtros aplicados"}
+            </p>
+          </div>
+          <BotonActualizar className="shrink-0" />
         </div>
 
         <div className="grid min-w-0 gap-3">

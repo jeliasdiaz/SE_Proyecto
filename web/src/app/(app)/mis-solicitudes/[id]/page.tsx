@@ -2,10 +2,11 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { z } from "zod"
+import { AvisoSolicitudCreada } from "@/components/aviso-solicitud-creada"
+import { BotonActualizar } from "@/components/boton-actualizar"
 import { DescargarAdjunto } from "@/components/descargar-adjunto"
 import { EstadoBadge } from "@/components/estado-badge"
 import { HistorialTimeline, type EventoHistorial } from "@/components/historial-timeline"
-import { MensajeFormulario } from "@/components/mensaje-formulario"
 import { TransicionPagina } from "@/components/transicion-pagina"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -58,13 +59,16 @@ export default async function DetalleSolicitudPage({ params, searchParams }: Pag
     <TransicionPagina>
       <div className="grid gap-6">
         <div className="grid gap-2">
-          <Link
-            href="/mis-solicitudes"
-            transitionTypes={["nav-back"]}
-            className="w-fit text-sm text-muted-foreground hover:underline"
-          >
-            ← Mis solicitudes
-          </Link>
+          <div className="flex items-center justify-between gap-4">
+            <Link
+              href="/mis-solicitudes"
+              transitionTypes={["nav-back"]}
+              className="w-fit text-sm text-muted-foreground hover:underline"
+            >
+              ← Mis solicitudes
+            </Link>
+            <BotonActualizar />
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">{solicitud.asunto}</h1>
             <EstadoBadge estado={solicitud.estado} />
@@ -79,9 +83,7 @@ export default async function DetalleSolicitudPage({ params, searchParams }: Pag
           </p>
         </div>
 
-        {creada === "1" && (
-          <MensajeFormulario ok mensaje="Tu solicitud quedó registrada como Pendiente. Aquí verás cada avance." />
-        )}
+        {creada === "1" && <AvisoSolicitudCreada />}
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="grid content-start gap-6 lg:col-span-2">

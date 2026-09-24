@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { BotonActualizar } from "@/components/boton-actualizar"
 import { EstadoBadge } from "@/components/estado-badge"
 import { TransicionPagina } from "@/components/transicion-pagina"
 import { Badge } from "@/components/ui/badge"
@@ -26,15 +27,18 @@ export default async function MisSolicitudesPage() {
   return (
     <TransicionPagina>
       <div className="grid gap-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+        <div className="flex items-start justify-between gap-4 sm:items-end">
+          <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Mis solicitudes</h1>
             <p className="text-sm text-muted-foreground">Estado y avance de cada trámite que has registrado.</p>
           </div>
-          {/* En móvil la barra inferior ya ofrece "Nueva solicitud". */}
-          <Button asChild className="hidden sm:inline-flex">
-            <Link href="/mis-solicitudes/nueva">Nueva solicitud</Link>
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <BotonActualizar />
+            {/* En móvil la barra inferior ya ofrece "Nueva solicitud". */}
+            <Button asChild className="hidden sm:inline-flex">
+              <Link href="/mis-solicitudes/nueva">Nueva solicitud</Link>
+            </Button>
+          </div>
         </div>
 
         {solicitudes.length === 0 ? (
