@@ -377,6 +377,17 @@ group by s.tipo;
 
 -- ---------------------------------------------------------------------------------------------
 -- Realtime: la bandeja se refresca cuando otro asesor toma o mueve un caso. Respeta RLS.
+-- Idempotente: si alguien ya activó Realtime para la tabla desde el panel, el alter fallaría y
+-- con él toda la migración.
 -- ---------------------------------------------------------------------------------------------
 
-alter publication supabase_realtime add table public.solicitudes;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'solicitudes'
+  ) then
+    alter publication supabase_realtime add table public.solicitudes;
+  end if;
+end;
+$$;
