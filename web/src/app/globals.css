@@ -81,13 +81,15 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  /* Gráficos de métricas. Los cuatro estados van en este orden y adyacentes: validados para
-     daltonismo con el script del skill dataviz (ámbar y verde bajan de 3:1 sobre blanco, por eso
-     siempre van con etiqueta visible y vista de tabla). */
+  /* Gráficos de métricas. Los cuatro primeros estados van en este orden y adyacentes: validados
+     para daltonismo con el script del skill dataviz (ámbar y verde bajan de 3:1 sobre blanco, por
+     eso siempre van con etiqueta visible y vista de tabla). Retirada es gris neutro: no es un
+     resultado de la gestión. */
   --grafico-pendiente: #f59e0b;
   --grafico-en-proceso: #0369a1;
   --grafico-finalizada: #2fc98e;
   --grafico-rechazada: #be123c;
+  --grafico-retirada: #64748b;
   --grafico-serie: #2a78d6;
 }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requerirPerfil } from "@/lib/auth"
+import { exigeObservacion } from "@/lib/dominio"
 import { createClient } from "@/lib/supabase/server"
 import {
   erroresDe,
@@ -38,8 +39,9 @@ export async function cambiarEstado(
   const datos = esquemaCambioEstado.safeParse(valores)
   if (!id.success) return { mensaje: "Solicitud no válida." }
   if (!datos.success) return { errores: erroresDe(datos.error), valores }
-  if (datos.data.estado === "rechazada" && !datos.data.observacion) {
-    return { errores: { observacion: ["Explica al estudiante por qué se rechaza."] }, valores }
+  if (exigeObservacion(datos.data.estado) && !datos.data.observacion) {
+    const motivo = datos.data.estado === "retirada" ? "por qué se retira" : "por qué se rechaza"
+    return { errores: { observacion: [`Explica al estudiante ${motivo}.`] }, valores }
   }
 
   const supabase = await createClient()

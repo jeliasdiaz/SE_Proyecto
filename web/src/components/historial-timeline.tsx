@@ -7,6 +7,7 @@ const PUNTO_ESTADO: Record<Estado, string> = {
   en_proceso: "bg-sky-600",
   finalizada: "bg-emerald-600",
   rechazada: "bg-rose-600",
+  retirada: "bg-slate-500",
 }
 
 export type EventoHistorial = {

@@ -19,6 +19,7 @@ const ESTILO_PANEL: Record<Estado, string> = {
   en_proceso: "border-sky-200 bg-sky-50/70",
   finalizada: "border-emerald-200 bg-emerald-50/70",
   rechazada: "border-rose-200 bg-rose-50/70",
+  retirada: "border-slate-200 bg-slate-50/70",
 }
 
 export function PanelGestion({ solicitudId, estadoActual }: { solicitudId: string; estadoActual: Estado }) {
@@ -90,7 +91,7 @@ export function PanelGestion({ solicitudId, estadoActual }: { solicitudId: strin
       )}
       <Campo
         id="observacion"
-        etiqueta={obligatoria ? "Motivo del rechazo (obligatorio)" : "Observación para el estudiante (opcional)"}
+        etiqueta={obligatoria ? `Motivo ${destino === "retirada" ? "del retiro" : "del rechazo"} (obligatorio)` : "Observación para el estudiante (opcional)"}
         errores={estado.errores?.observacion}
         ayuda="La verá el estudiante y se incluye en el correo de aviso."
       >

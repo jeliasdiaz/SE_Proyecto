@@ -18,6 +18,7 @@ const COLOR_ESTADO: Record<Estado, string> = {
   en_proceso: "var(--grafico-en-proceso)",
   finalizada: "var(--grafico-finalizada)",
   rechazada: "var(--grafico-rechazada)",
+  retirada: "var(--grafico-retirada)",
 }
 
 const PLURAL_ESTADO: Record<Estado, string> = {
@@ -25,6 +26,7 @@ const PLURAL_ESTADO: Record<Estado, string> = {
   en_proceso: "En proceso",
   finalizada: "Finalizadas",
   rechazada: "Rechazadas",
+  retirada: "Retiradas",
 }
 
 export default async function MetricasPage() {
@@ -73,7 +75,7 @@ export default async function MetricasPage() {
 
         <Card>
           <CardContent className="grid gap-5">
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
               <div className="col-span-2 grid content-start gap-1 sm:col-span-1">
                 <dt className="text-sm text-muted-foreground">Solicitudes</dt>
                 <dd>

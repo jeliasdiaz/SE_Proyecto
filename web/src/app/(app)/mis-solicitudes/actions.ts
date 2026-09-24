@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { z } from "zod"
 import { requerirPerfil } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { erroresDe, esquemaNuevaSolicitud, type EstadoFormulario } from "@/lib/validacion"
@@ -30,4 +31,31 @@ export async function crearSolicitud(entrada: unknown): Promise<EstadoFormulario
 
   revalidatePath("/mis-solicitudes")
   redirect(`/mis-solicitudes/${id}?creada=1`)
+}
+
+// El trigger validar_cambio_solicitud() y la política RLS deciden: solo quien la registró, y solo
+// mientras siga pendiente. Si el admin la movió antes, el UPDATE no encuentra la fila.
+export async function retirarSolicitud(solicitudId: string): Promise<{ ok: true } | { error: string }> {
+  await requerirPerfil("estudiante")
+  const id = z.uuid().safeParse(solicitudId)
+  if (!id.success) return { error: "Solicitud no válida." }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("solicitudes")
+    .update({ estado: "retirada" })
+    .eq("id", id.data)
+    .select("id")
+  if (error) {
+    if (error.code === "23514") return { error: error.message }
+    console.error("No se pudo retirar la solicitud:", error)
+    return { error: "No pudimos retirar la solicitud. Inténtalo de nuevo." }
+  }
+  if (data.length === 0) {
+    return { error: "La solicitud ya no se puede retirar: la coordinación empezó a gestionarla." }
+  }
+
+  revalidatePath("/mis-solicitudes")
+  revalidatePath(`/mis-solicitudes/${id.data}`)
+  return { ok: true }
 }

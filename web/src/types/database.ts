@@ -294,7 +294,7 @@ export type Database = {
     }
     Enums: {
       estado_revision: "ok" | "por_revisar"
-      estado_solicitud: "pendiente" | "en_proceso" | "finalizada" | "rechazada"
+      estado_solicitud: "pendiente" | "en_proceso" | "finalizada" | "rechazada" | "retirada"
       origen_solicitud: "web" | "correo"
       rol_usuario: "estudiante" | "admin"
       tipo_solicitud:
@@ -435,7 +435,7 @@ export const Constants = {
   public: {
     Enums: {
       estado_revision: ["ok", "por_revisar"],
-      estado_solicitud: ["pendiente", "en_proceso", "finalizada", "rechazada"],
+      estado_solicitud: ["pendiente", "en_proceso", "finalizada", "rechazada", "retirada"],
       origen_solicitud: ["web", "correo"],
       rol_usuario: ["estudiante", "admin"],
       tipo_solicitud: [

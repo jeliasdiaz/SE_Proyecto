@@ -1,4 +1,4 @@
-import { CheckCircle2Icon, CircleXIcon, Clock3Icon, LoaderCircleIcon, type LucideIcon } from "lucide-react"
+import { CheckCircle2Icon, CircleXIcon, Clock3Icon, LoaderCircleIcon, Undo2Icon, type LucideIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ETIQUETA_ESTADO, type Estado } from "@/lib/dominio"
 import { cn } from "@/lib/utils"
@@ -8,6 +8,7 @@ const ESTILO: Record<Estado, string> = {
   en_proceso: "border-sky-300 bg-sky-50 text-sky-950 shadow-sm shadow-sky-100",
   finalizada: "border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm shadow-emerald-100",
   rechazada: "border-rose-300 bg-rose-50 text-rose-950 shadow-sm shadow-rose-100",
+  retirada: "border-slate-300 bg-slate-50 text-slate-900 shadow-sm shadow-slate-100",
 }
 
 const ICONO: Record<Estado, LucideIcon> = {
@@ -15,6 +16,7 @@ const ICONO: Record<Estado, LucideIcon> = {
   en_proceso: LoaderCircleIcon,
   finalizada: CheckCircle2Icon,
   rechazada: CircleXIcon,
+  retirada: Undo2Icon,
 }
 
 export function EstadoBadge({ estado, className }: { estado: Estado; className?: string }) {

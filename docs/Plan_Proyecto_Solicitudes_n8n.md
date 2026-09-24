@@ -13,8 +13,8 @@ Fecha del plan: 17/09/2026 · Versión 2 (MVP hasta Tarea 1)
 
 **Solución.** Una aplicación web donde:
 
-- El estudiante inicia sesión, registra su solicitud (tipo, asunto, descripción, adjunto opcional) y consulta su avance.
-- El administrador revisa cada caso, cambia su estado (`Pendiente`, `En proceso`, `Finalizada`, `Rechazada`) y agrega observaciones.
+- El estudiante inicia sesión, registra su solicitud (tipo, asunto, descripción, adjunto opcional) y consulta su avance. Mientras siga pendiente, puede retirarla.
+- El administrador revisa cada caso, cambia su estado (`Pendiente`, `En proceso`, `Finalizada`, `Rechazada`, `Retirada`) y agrega observaciones. Un desistimiento con el caso en proceso lo registra el administrador como `Retirada`, con observación.
 - Cada cambio queda en un historial: fecha, estado anterior, estado nuevo y responsable.
 - n8n automatiza los avisos y convierte las solicitudes que llegan por correo en casos.
 

@@ -11,25 +11,29 @@ export const ETIQUETA_ESTADO: Record<Estado, string> = {
   en_proceso: "En proceso",
   finalizada: "Finalizada",
   rechazada: "Rechazada",
+  retirada: "Retirada",
 }
 
 export const ESTADOS = Object.keys(ETIQUETA_ESTADO) as Estado[]
 
 // Espejo de validar_cambio_solicitud() en la base de datos. Aquí solo sirve para mostrar
-// las opciones válidas; quien decide es el trigger.
+// las opciones válidas; quien decide es el trigger. El estudiante solo puede pasar su solicitud
+// de pendiente a retirada.
 export const TRANSICIONES: Record<Estado, readonly Estado[]> = {
-  pendiente: ["en_proceso", "rechazada"],
-  en_proceso: ["finalizada", "rechazada"],
+  pendiente: ["en_proceso", "rechazada", "retirada"],
+  en_proceso: ["finalizada", "rechazada", "retirada"],
   finalizada: [],
   rechazada: [],
+  retirada: [],
 }
 
 export function puedeTransicionar(de: Estado, a: Estado): boolean {
   return TRANSICIONES[de].includes(a)
 }
 
+// Solo para el admin: el retiro que hace el estudiante no lleva observación.
 export function exigeObservacion(estado: Estado): boolean {
-  return estado === "rechazada"
+  return estado === "rechazada" || estado === "retirada"
 }
 
 // Espejo de dias_recordatorio() en la base de datos: días sin cambios para considerar un caso

@@ -14,6 +14,7 @@ import { requerirPerfil } from "@/lib/auth"
 import { ETIQUETA_TIPO } from "@/lib/dominio"
 import { formatearFechaHora } from "@/lib/fechas"
 import { createClient } from "@/lib/supabase/server"
+import { PanelRetiro } from "./panel-retiro"
 
 export const metadata: Metadata = { title: "Detalle de solicitud" }
 
@@ -112,14 +113,32 @@ export default async function DetalleSolicitudPage({ params, searchParams }: Pag
               </CardContent>
             </Card>
           </div>
-          <Card className="content-start">
-            <CardHeader>
-              <CardTitle>Seguimiento</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HistorialTimeline eventos={eventos} />
-            </CardContent>
-          </Card>
+          <div className="grid content-start gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Seguimiento</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <HistorialTimeline eventos={eventos} />
+              </CardContent>
+            </Card>
+            {solicitud.estado === "pendiente" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>¿Ya no la necesitas?</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PanelRetiro solicitudId={solicitud.id} />
+                </CardContent>
+              </Card>
+            )}
+            {/* Desde en proceso ya hay un responsable: el retiro lo registra la coordinación. */}
+            {solicitud.estado === "en_proceso" && (
+              <p className="text-sm text-muted-foreground">
+                ¿Quieres desistir? Escríbele a la coordinación académica; ya está gestionando tu caso.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </TransicionPagina>
