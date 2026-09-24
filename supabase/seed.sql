@@ -203,7 +203,7 @@ begin
 
     insert into public.solicitudes (
       id, estudiante_id, tipo, asunto, descripcion, estado, observaciones, origen, revision,
-      motivo_revision, responsable_id, creada, actualizada
+      motivo_revision, responsable_id, creada, actualizada, cerrada
     ) values (
       v_id,
       v_estudiante,
@@ -221,7 +221,8 @@ begin
       v_motivo,
       v_responsable,
       v_creada,
-      v_actualizada
+      v_actualizada,
+      case when v_estado in ('finalizada', 'rechazada') then v_cierre end
     );
 
     insert into public.historial_estados (solicitud_id, estado_anterior, estado_nuevo, observacion, usuario_id, fecha)

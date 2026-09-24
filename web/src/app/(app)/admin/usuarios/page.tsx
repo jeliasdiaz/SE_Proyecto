@@ -1,141 +1,96 @@
 import type { Metadata } from "next"
-import { SearchIcon, UsersIcon } from "lucide-react"
+import Link from "next/link"
+import { UsersIcon } from "lucide-react"
 import { TransicionPagina } from "@/components/transicion-pagina"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { requerirPerfil } from "@/lib/auth"
-import { ETIQUETA_ROL, ROLES_PERSONAL, type Rol } from "@/lib/dominio"
+import { ETIQUETA_ROL } from "@/lib/dominio"
 import { createClient } from "@/lib/supabase/server"
 import { BotonRol } from "./boton-rol"
+import { BuscadorPersonas } from "./buscador-personas"
 
-export const metadata: Metadata = { title: "Usuarios" }
+export const metadata: Metadata = { title: "Roles del equipo" }
 
-const MAXIMO_RESULTADOS = 20
-
-type Persona = { id: string; nombre: string; correo: string; rol: Rol; id_estudiantil: string | null }
-
-export default async function UsuariosPage({ searchParams }: PageProps<"/admin/usuarios">) {
-  const { q: valor } = await searchParams
-  // Sin caracteres con significado en la sintaxis de filtros de PostgREST.
-  const q = (typeof valor === "string" ? valor : "")
-    .replace(/[,()"'\\%*]/g, " ")
-    .trim()
-    .slice(0, 80)
+export default async function RolesPage() {
   const perfil = await requerirPerfil("admin")
   const supabase = await createClient()
+  // carga_por_asesor ya trae a todo el personal con sus casos abiertos: una sola consulta.
+  const { data, error } = await supabase.from("carga_por_asesor").select("id, nombre, correo, rol, pendientes, en_proceso")
+  if (error) throw error
 
-  const columnas = "id, nombre, correo, rol, id_estudiantil"
-  const [personal, busqueda] = await Promise.all([
-    supabase.from("perfiles").select(columnas).in("rol", ROLES_PERSONAL).order("rol").order("nombre"),
-    q
-      ? supabase
-          .from("perfiles")
-          .select(columnas)
-          .or(`nombre.ilike.%${q}%,correo.ilike.%${q}%,id_estudiantil.ilike.%${q}%`)
-          .order("nombre")
-          .limit(MAXIMO_RESULTADOS)
-      : Promise.resolve({ data: null, error: null }),
-  ])
-  if (personal.error) throw personal.error
-  if (busqueda.error) throw busqueda.error
+  const equipo = data
+    .flatMap((p) =>
+      p.id && p.rol
+        ? [{ id: p.id, nombre: p.nombre ?? "Sin nombre", correo: p.correo ?? "", rol: p.rol, abiertas: (p.pendientes ?? 0) + (p.en_proceso ?? 0) }]
+        : []
+    )
+    // Admins primero; dentro de cada grupo, por nombre.
+    .sort((a, b) => (a.rol === b.rol ? a.nombre.localeCompare(b.nombre) : a.rol === "admin" ? -1 : 1))
 
   return (
     <TransicionPagina>
       <div className="grid gap-6">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Usuarios</h1>
-          <p className="text-sm text-muted-foreground">
-            Da o quita el rol de asesor. El rol de administrador solo se asigna directamente en la base de datos.
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Roles del equipo</h1>
+          <p className="text-sm text-muted-foreground">Quién tiene acceso a la bandeja de solicitudes.</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Buscar persona</CardTitle>
-            <CardDescription>
-              Solo aparecen quienes ya confirmaron su correo. Para sumar a alguien nuevo, primero debe registrarse.
-            </CardDescription>
+            <CardTitle>Equipo ({equipo.length})</CardTitle>
+            <CardDescription>Los administradores se asignan fuera de la aplicación.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4">
-            <form action="/admin/usuarios" role="search" className="relative">
-              <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                name="q"
-                type="search"
-                defaultValue={q}
-                placeholder="Nombre, correo o ID estudiantil"
-                aria-label="Buscar por nombre, correo o ID estudiantil"
-                className="pl-9"
-              />
-            </form>
-            {busqueda.data &&
-              (busqueda.data.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nadie coincide con «{q}».</p>
-              ) : (
-                <ListaPersonas personas={busqueda.data} yo={perfil.id} />
-              ))}
-            {busqueda.data?.length === MAXIMO_RESULTADOS && (
-              <p className="text-xs text-muted-foreground">
-                Se muestran los primeros {MAXIMO_RESULTADOS}. Escribe algo más específico para acotar.
+          <CardContent>
+            {equipo.length === 0 ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <UsersIcon className="size-4" /> Todavía no hay nadie.
               </p>
+            ) : (
+              <ul className="-mx-2 grid divide-y">
+                {equipo.map((p) => (
+                  <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-2 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-2">
+                        <span className="truncate font-medium">{p.nombre}</span>
+                        <Badge variant="secondary">{ETIQUETA_ROL[p.rol]}</Badge>
+                        {p.id === perfil.id && <Badge variant="outline">Tú</Badge>}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{p.correo}</p>
+                    </div>
+                    {p.rol === "asesor" &&
+                      (p.abiertas > 0 ? (
+                        // cambiar_rol() lo rechazaría: se explica antes de que lo intente.
+                        <p className="text-right text-xs text-muted-foreground">
+                          {p.abiertas} {p.abiertas === 1 ? "caso abierto" : "casos abiertos"}
+                          <br />
+                          <Link
+                            href={`/gestion?responsable=${p.id}`}
+                            className="font-medium text-foreground underline underline-offset-4"
+                          >
+                            Reasígnalos para quitarle el rol
+                          </Link>
+                        </p>
+                      ) : (
+                        <BotonRol usuarioId={p.id} nombre={p.nombre} accion="degradar" />
+                      ))}
+                  </li>
+                ))}
+              </ul>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Coordinación ({personal.data.length})</CardTitle>
-            <CardDescription>Administradores y asesores con acceso a la bandeja.</CardDescription>
+            <CardTitle>Agregar asesor</CardTitle>
+            <CardDescription>Busca a alguien que ya se haya registrado y confirmado su correo.</CardDescription>
           </CardHeader>
           <CardContent>
-            {personal.data.length === 0 ? (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <UsersIcon className="size-4" /> Todavía no hay nadie.
-              </p>
-            ) : (
-              <ListaPersonas personas={personal.data} yo={perfil.id} />
-            )}
+            <BuscadorPersonas />
           </CardContent>
         </Card>
       </div>
     </TransicionPagina>
-  )
-}
-
-function ListaPersonas({ personas, yo }: { personas: Persona[]; yo: string }) {
-  return (
-    <ul className="-mx-2 grid divide-y">
-      {personas.map((p) => (
-        <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-2 py-2.5">
-          <div className="min-w-0 flex-1">
-            <p className="flex flex-wrap items-center gap-2">
-              <span className="truncate font-medium">{p.nombre}</span>
-              <Badge variant={p.rol === "estudiante" ? "outline" : "secondary"}>{ETIQUETA_ROL[p.rol]}</Badge>
-              {p.id === yo && <span className="text-xs text-muted-foreground">(tú)</span>}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {p.correo}
-              {p.id_estudiantil && ` · ID ${p.id_estudiantil}`}
-            </p>
-          </div>
-          <AccionRol persona={p} yo={yo} />
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-// Mismas reglas que cambiar_rol(): la base de datos las vuelve a comprobar.
-function AccionRol({ persona, yo }: { persona: Persona; yo: string }) {
-  if (persona.id === yo || persona.rol === "admin") {
-    return <span className="text-xs text-muted-foreground">Solo por base de datos</span>
-  }
-  return (
-    <BotonRol
-      usuarioId={persona.id}
-      nombre={persona.nombre}
-      accion={persona.rol === "estudiante" ? "promover" : "degradar"}
-    />
   )
 }
