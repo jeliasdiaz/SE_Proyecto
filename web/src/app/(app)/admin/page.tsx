@@ -1,24 +1,35 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ChevronRightIcon, ClockIcon, UserCogIcon, UsersIcon } from "lucide-react"
+import { ChevronRightIcon, ClockIcon, ScaleIcon, UserCogIcon, UsersIcon } from "lucide-react"
 import { BotonActualizar } from "@/components/boton-actualizar"
 import { TransicionPagina } from "@/components/transicion-pagina"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { requerirPerfil } from "@/lib/auth"
 import { DIAS_RECORDATORIO, ETIQUETA_ROL } from "@/lib/dominio"
 import { formatearDuracion, tiempoRelativo } from "@/lib/fechas"
 import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
+import { BarraCarga, LeyendaCarga } from "./barra-carga"
 
-export const metadata: Metadata = { title: "Asesores" }
+export const metadata: Metadata = { title: "Carga del equipo" }
 
-export default async function AsesoresPage() {
+// Se avisa cuando alguien tiene al menos 1,5 veces el promedio de casos abiertos del equipo.
+// Con menos de 5 casos abiertos en total la diferencia no dice nada.
+const FACTOR_DESBALANCE = 1.5
+const MINIMO_PARA_AVISAR = 5
+
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+
+export default async function CargaEquipoPage() {
+  const perfil = await requerirPerfil("admin")
   const supabase = await createClient()
   const [carga, libres, estancadasLibres] = await Promise.all([
     supabase
       .from("carga_por_asesor")
-      .select("id, nombre, correo, rol, pendientes, en_proceso, finalizadas, rechazadas, estancadas, horas_resolucion, ultima_actividad"),
+      .select("id, nombre, rol, pendientes, en_proceso, finalizadas, rechazadas, estancadas, horas_resolucion, ultima_actividad"),
     supabase
       .from("solicitudes")
       .select("id", { count: "exact", head: true })
@@ -38,21 +49,37 @@ export default async function AsesoresPage() {
       p.id && p.rol
         ? [
             {
-              ...p,
               id: p.id,
+              nombre: p.nombre ?? "Sin nombre",
               rol: p.rol,
               abiertas: (p.pendientes ?? 0) + (p.en_proceso ?? 0),
+              estancadas: p.estancadas ?? 0,
               cerradas: (p.finalizadas ?? 0) + (p.rechazadas ?? 0),
+              horasResolucion: p.horas_resolucion,
+              ultimaActividad: p.ultima_actividad,
             },
           ]
         : []
     )
     // Primero quien más casos abiertos tiene: es a quien conviene quitarle carga.
-    .sort((a, b) => b.abiertas - a.abiertas || (a.nombre ?? "").localeCompare(b.nombre ?? ""))
+    .sort((a, b) => b.abiertas - a.abiertas || b.estancadas - a.estancadas || a.nombre.localeCompare(b.nombre))
+
   const asesores = personas.filter((p) => p.rol === "asesor").length
   const abiertasAsignadas = personas.reduce((suma, p) => suma + p.abiertas, 0)
+  const maximo = Math.max(0, ...personas.map((p) => p.abiertas))
   const sinAsignar = libres.count ?? 0
-  const estancadas = personas.reduce((suma, p) => suma + (p.estancadas ?? 0), 0) + (estancadasLibres.count ?? 0)
+  const estancadasAsignadas = personas.reduce((suma, p) => suma + p.estancadas, 0)
+  const estancadasSinAsignar = estancadasLibres.count ?? 0
+  const estancadas = estancadasAsignadas + estancadasSinAsignar
+
+  const promedio = personas.length > 0 ? abiertasAsignadas / personas.length : 0
+  const masCargada = personas[0]
+  const desbalance =
+    personas.length >= 2 &&
+    abiertasAsignadas >= MINIMO_PARA_AVISAR &&
+    masCargada.abiertas >= promedio * FACTOR_DESBALANCE
+      ? masCargada
+      : null
   const ahora = new Date()
 
   return (
@@ -60,33 +87,59 @@ export default async function AsesoresPage() {
       <div className="grid gap-6">
         <div className="flex items-start justify-between gap-4 sm:items-end">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Asesores</h1>
-            <p className="text-sm text-muted-foreground">Quién atiende qué y cuánta carga tiene cada persona.</p>
+            <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Carga del equipo</h1>
+            <p className="text-sm text-muted-foreground">Quién atiende qué y quién necesita ayuda.</p>
           </div>
           <BotonActualizar className="shrink-0" />
         </div>
 
         <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Indicador etiqueta="Asesores" valor={asesores} />
-          <Indicador etiqueta="Casos abiertos asignados" valor={abiertasAsignadas} />
+          <Indicador etiqueta="Abiertos asignados" valor={abiertasAsignadas} />
           <Indicador
             etiqueta="Sin asignar"
             valor={sinAsignar}
+            detalle={sinAsignar > 0 ? "Ver en la bandeja" : "Todo tiene responsable"}
             href={sinAsignar > 0 ? "/gestion?responsable=libres" : undefined}
             tono={sinAsignar > 0 ? "alerta" : undefined}
           />
           <Indicador
             etiqueta={`Estancados (${DIAS_RECORDATORIO}+ días)`}
             valor={estancadas}
+            detalle={
+              estancadas > 0 ? `${estancadasAsignadas} asignados · ${estancadasSinAsignar} sin asignar` : "Nada detenido"
+            }
             href={estancadas > 0 ? "/admin/metricas" : undefined}
             tono={estancadas > 0 ? "critico" : undefined}
           />
         </dl>
 
+        {desbalance && (
+          <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+            <ScaleIcon />
+            <AlertTitle>
+              {desbalance.id === perfil.id ? "Tú concentras" : `${desbalance.nombre} concentra`} el{" "}
+              {Math.round((desbalance.abiertas / abiertasAsignadas) * 100)} % de los casos abiertos
+            </AlertTitle>
+            <AlertDescription className="text-amber-900/80">
+              <p>
+                {desbalance.abiertas} de {abiertasAsignadas}; el promedio del equipo es {promedio.toFixed(1).replace(".", ",")}.{" "}
+                <Link
+                  href={`/gestion?responsable=${desbalance.id}&estado=pendiente`}
+                  className="font-medium text-amber-950 underline underline-offset-4"
+                >
+                  Ver sus pendientes para reasignar
+                </Link>
+              </p>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card className="gap-0 pb-0">
-          <CardHeader className="border-b pb-4">
-            <CardTitle>Carga por persona</CardTitle>
-            <CardDescription>Abre una fila para ver en la bandeja los casos de esa persona.</CardDescription>
+          <CardHeader className="gap-2 border-b pb-4">
+            <CardTitle>Casos abiertos por persona</CardTitle>
+            <CardDescription>Abre una fila para ver sus casos en la bandeja.</CardDescription>
+            {personas.length > 0 && <LeyendaCarga />}
           </CardHeader>
           <CardContent className="px-0">
             {personas.length === 0 ? (
@@ -98,54 +151,30 @@ export default async function AsesoresPage() {
                 <Button asChild variant="outline" size="sm">
                   <Link href="/admin/usuarios">
                     <UserCogIcon data-icon="inline-start" />
-                    Asignar asesores
+                    Agregar asesores
                   </Link>
                 </Button>
               </div>
             ) : (
               <ul className="divide-y">
-                <li
-                  aria-hidden
-                  className="hidden grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_1rem] gap-4 px-4 py-2 text-xs font-medium text-muted-foreground md:grid"
-                >
-                  <span>Persona</span>
-                  <span className="text-right">Abiertas</span>
-                  <span className="text-right">Estancadas</span>
-                  <span className="text-right">Cerradas</span>
-                  <span className="text-right">Resolución</span>
-                </li>
                 {personas.map((p) => (
                   <li key={p.id}>
                     <Link
                       href={`/gestion?responsable=${p.id}`}
-                      className="group grid grid-cols-3 gap-x-4 gap-y-2 px-4 py-3 transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60 md:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_1rem] md:items-center"
+                      className="group grid gap-x-6 gap-y-2 px-4 py-3 transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60 md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)_1rem] md:items-center"
                     >
-                      <span className="col-span-3 min-w-0 md:col-span-1">
-                        <span className="flex items-center gap-2">
+                      <span className="grid min-w-0 gap-0.5">
+                        <span className="flex min-w-0 items-center gap-2">
                           <span className="truncate font-medium">{p.nombre}</span>
+                          {p.id === perfil.id && <Badge variant="outline">Tú</Badge>}
                           {p.rol === "admin" && <Badge variant="secondary">{ETIQUETA_ROL.admin}</Badge>}
                         </span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {p.correo}
-                          {p.ultima_actividad && ` · último movimiento ${tiempoRelativo(p.ultima_actividad, ahora)}`}
-                        </span>
+                        <Resumen persona={p} ahora={ahora} />
                       </span>
-                      <Dato etiqueta="Abiertas" valor={String(p.abiertas)} detalle={`${p.pendientes ?? 0} pend. · ${p.en_proceso ?? 0} en proc.`} />
-                      <Dato
-                        etiqueta="Estancadas"
-                        valor={String(p.estancadas ?? 0)}
-                        className={cn(
-                          (p.estancadas ?? 0) > 0 && "text-amber-700",
-                          (p.estancadas ?? 0) >= 3 && "text-rose-700"
-                        )}
-                        icono={(p.estancadas ?? 0) > 0}
-                      />
-                      <Dato etiqueta="Cerradas" valor={String(p.cerradas)} />
-                      <Dato
-                        etiqueta="Resolución"
-                        valor={formatearDuracion(p.horas_resolucion)}
-                        className="col-span-3 md:col-span-1"
-                      />
+                      <span className="flex min-w-0 items-center gap-2">
+                        <BarraCarga abiertas={p.abiertas} estancadas={p.estancadas} maximo={maximo} />
+                        <span className="w-6 text-right text-sm font-semibold tabular-nums">{p.abiertas}</span>
+                      </span>
                       <ChevronRightIcon className="hidden size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 md:block" />
                     </Link>
                   </li>
@@ -159,9 +188,61 @@ export default async function AsesoresPage() {
   )
 }
 
-type PropsIndicador = { etiqueta: string; valor: number; href?: string; tono?: "alerta" | "critico" }
+type Persona = {
+  abiertas: number
+  estancadas: number
+  cerradas: number
+  horasResolucion: number | null
+  ultimaActividad: string | null
+}
 
-function Indicador({ etiqueta, valor, href, tono }: PropsIndicador) {
+// Solo lo que aporta: sin ceros ni guiones. Dos líneas fijas (cuánto tiene y a qué ritmo va) para
+// que al envolver ningún separador quede suelto al inicio de una línea.
+function Resumen({ persona: p, ahora }: { persona: Persona; ahora: Date }) {
+  const carga: React.ReactNode[] = [p.abiertas > 0 ? plural(p.abiertas, "abierto", "abiertos") : "Sin casos abiertos"]
+  if (p.estancadas > 0) {
+    carga.push(
+      <span key="estancadas" className="inline-flex items-center gap-1 font-medium text-rose-700">
+        <ClockIcon className="size-3" aria-hidden />
+        {plural(p.estancadas, "estancado", "estancados")}
+      </span>
+    )
+  }
+  if (p.cerradas > 0) carga.push(plural(p.cerradas, "cerrado", "cerrados"))
+  const ritmo: React.ReactNode[] = []
+  if (p.horasResolucion !== null) ritmo.push(`resuelve en ${formatearDuracion(p.horasResolucion)}`)
+  if (p.ultimaActividad) ritmo.push(`activo ${tiempoRelativo(p.ultimaActividad, ahora)}`)
+
+  return (
+    <>
+      <Linea partes={carga} />
+      {ritmo.length > 0 && <Linea partes={ritmo} />}
+    </>
+  )
+}
+
+function Linea({ partes }: { partes: React.ReactNode[] }) {
+  return (
+    <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+      {partes.map((parte, i) => (
+        <span key={i} className="inline-flex items-center gap-1.5">
+          {i > 0 && <span aria-hidden>·</span>}
+          {parte}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+type PropsIndicador = {
+  etiqueta: string
+  valor: number
+  detalle?: string
+  href?: string
+  tono?: "alerta" | "critico"
+}
+
+function Indicador({ etiqueta, valor, detalle, href, tono }: PropsIndicador) {
   const contenido = (
     <>
       <dt className="text-sm text-muted-foreground">{etiqueta}</dt>
@@ -174,6 +255,7 @@ function Indicador({ etiqueta, valor, href, tono }: PropsIndicador) {
       >
         {valor}
       </dd>
+      {detalle && <dd className="text-xs text-muted-foreground">{detalle}</dd>}
     </>
   )
   const clases = "grid content-start gap-1 rounded-xl border bg-card p-4"
@@ -185,21 +267,5 @@ function Indicador({ etiqueta, valor, href, tono }: PropsIndicador) {
     >
       {contenido}
     </Link>
-  )
-}
-
-type PropsDato = { etiqueta: string; valor: string; detalle?: string; className?: string; icono?: boolean }
-
-// En móvil lleva su etiqueta; desde md la etiqueta está en el encabezado de la lista.
-function Dato({ etiqueta, valor, detalle, className, icono }: PropsDato) {
-  return (
-    <span className={cn("grid content-start md:text-right", className)}>
-      <span className="text-xs text-muted-foreground md:sr-only">{etiqueta}</span>
-      <span className="inline-flex items-center gap-1 font-medium tabular-nums md:justify-end">
-        {icono && <ClockIcon className="size-3.5" aria-hidden />}
-        {valor}
-      </span>
-      {detalle && <span className="text-xs text-muted-foreground">{detalle}</span>}
-    </span>
   )
 }

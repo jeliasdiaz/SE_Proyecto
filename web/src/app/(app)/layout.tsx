@@ -12,10 +12,10 @@ const ENLACES: Record<Rol, Enlace[]> = {
   ],
   asesor: [{ href: "/gestion", etiqueta: "Bandeja", icono: "bandeja" }],
   admin: [
-    { href: "/admin", etiqueta: "Asesores", icono: "asesores" },
+    { href: "/admin", etiqueta: "Equipo", icono: "asesores" },
     { href: "/gestion", etiqueta: "Bandeja", icono: "bandeja" },
     { href: "/admin/metricas", etiqueta: "Métricas", icono: "metricas" },
-    { href: "/admin/usuarios", etiqueta: "Usuarios", icono: "usuarios" },
+    { href: "/admin/usuarios", etiqueta: "Roles", icono: "usuarios" },
   ],
 }
 

@@ -189,7 +189,7 @@ export default async function MetricasPage() {
             <CardTitle>Resolución por responsable</CardTitle>
             <CardDescription>
               Tiempo promedio desde el registro hasta el cierre de los casos que cada persona tiene a su cargo. La carga
-              actual está en <Link href="/admin" className="underline underline-offset-4 hover:text-foreground">Asesores</Link>.
+              actual está en <Link href="/admin" className="underline underline-offset-4 hover:text-foreground">Equipo</Link>.
             </CardDescription>
           </CardHeader>
           <CardContent>
