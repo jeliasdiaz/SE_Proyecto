@@ -167,6 +167,7 @@ export type Database = {
       solicitudes: {
         Row: {
           actualizada: string
+          cerrada: string | null
           adjunto_path: string | null
           asunto: string
           creada: string
@@ -183,6 +184,7 @@ export type Database = {
         }
         Insert: {
           actualizada?: string
+          cerrada?: string | null
           adjunto_path?: string | null
           asunto: string
           creada?: string
@@ -199,6 +201,7 @@ export type Database = {
         }
         Update: {
           actualizada?: string
+          cerrada?: string | null
           adjunto_path?: string | null
           asunto?: string
           creada?: string
@@ -313,6 +316,27 @@ export type Database = {
           p_usuario: string
         }
         Returns: undefined
+      }
+      conteos_bandeja: {
+        Args: {
+          p_estado?: Database["public"]["Enums"]["estado_solicitud"]
+          p_origen?: Database["public"]["Enums"]["origen_solicitud"]
+          p_por_revisar?: boolean
+          p_q?: string
+          p_responsable?: string
+          p_solo_libres?: boolean
+          p_tipo?: Database["public"]["Enums"]["tipo_solicitud"]
+        }
+        Returns: {
+          en_proceso: number
+          finalizada: number
+          libres: number
+          mias: number
+          pendiente: number
+          por_revisar: number
+          rechazada: number
+          retirada: number
+        }[]
       }
       es_admin: { Args: never; Returns: boolean }
       es_asesor: { Args: never; Returns: boolean }

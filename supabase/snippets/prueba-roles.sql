@@ -97,6 +97,15 @@ select pg_temp.como('laura.ospina@demo.test');
 select pg_temp.vale('1 asesor ve todas', 'select count(*) from public.solicitudes', '40');
 select pg_temp.filas('2 asesor toma un caso libre',
   format($q$update public.solicitudes set responsable_id = %L where id = %L and responsable_id is null$q$, :'laura', :'libre1'), 1);
+-- conteos_bandeja() debe dar lo mismo que los conteos por separado que reemplaza.
+select pg_temp.vale('3c conteos_bandeja: pendientes',
+  $q$select (select pendiente from public.conteos_bandeja()) = (select count(*) from public.solicitudes where estado = 'pendiente')$q$, 'true');
+select pg_temp.vale('3d conteos_bandeja: mías con filtro de tipo',
+  $q$select (select mias from public.conteos_bandeja(p_tipo => 'supletorio')) = (select count(*) from public.solicitudes where responsable_id = auth.uid() and tipo = 'supletorio')$q$, 'true');
+select pg_temp.vale('3e conteos_bandeja: libres ignora el filtro de responsable',
+  $q$select (select libres from public.conteos_bandeja(p_responsable => auth.uid())) = (select count(*) from public.solicitudes where responsable_id is null and estado in ('pendiente', 'en_proceso'))$q$, 'true');
+select pg_temp.vale('3f conteos_bandeja: pestaña respeta el responsable',
+  $q$select (select en_proceso from public.conteos_bandeja(p_responsable => auth.uid(), p_estado => 'pendiente')) = (select count(*) from public.solicitudes where responsable_id = auth.uid() and estado = 'en_proceso')$q$, 'true');
 select pg_temp.vale('3 asesor no ve métricas', 'select count(*) from public.carga_por_asesor', '0');
 select pg_temp.vale('3b asesor no ve métricas', 'select count(*) from public.metricas_por_estado', '0');
 select pg_temp.falla('4 asesor no reabre',
@@ -119,6 +128,8 @@ select pg_temp.filas('9 otro asesor no puede clasificarlo',
   format($q$update public.solicitudes set tipo = 'otro' where id = %L$q$, :'libre1'), 0);
 select pg_temp.filas('10 asesor gestiona lo suyo',
   format($q$update public.solicitudes set estado = 'finalizada', observaciones = 'Listo' where id = %L$q$, :'de_mateo'), 1);
+select pg_temp.vale('10b cerrar guarda la fecha de cierre',
+  format($q$select (cerrada is not null)::text from public.solicitudes where id = %L$q$, :'de_mateo'), 'true');
 select pg_temp.falla('11 asesor no reasigna',
   format($q$update public.solicitudes set responsable_id = %L where id = %L$q$, :'laura', :'de_mateo'),
   'Solo un administrador puede reasignar');
@@ -150,6 +161,8 @@ select pg_temp.filas('19 admin reabre',
   format($q$update public.solicitudes set estado = 'en_proceso', observaciones = 'Se revisa de nuevo' where id = %L$q$, :'cerrada_laura'), 1);
 select pg_temp.vale('19b la reapertura queda en el historial',
   format($q$select count(*) from public.historial_estados where solicitud_id = %L and estado_anterior = 'finalizada' and estado_nuevo = 'en_proceso'$q$, :'cerrada_laura'), '1');
+select pg_temp.vale('19d reabrir borra la fecha de cierre',
+  format($q$select (cerrada is null)::text from public.solicitudes where id = %L$q$, :'cerrada_laura'), 'true');
 select pg_temp.vale('19c reabrir conserva el responsable',
   format($q$select responsable_id from public.solicitudes where id = %L$q$, :'cerrada_laura'), :'laura');
 select pg_temp.falla('20 no se promueve a admin desde la app',

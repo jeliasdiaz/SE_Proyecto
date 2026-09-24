@@ -92,24 +92,21 @@ type Filtrable<T> = {
   or(filtros: string): T
 }
 
-type Omitible = "estado" | "revision" | "responsable"
-
 // Aplica el filtro de responsable; `yo` resuelve "mias".
 function filtrarResponsable<T extends Filtrable<T>>(consulta: T, responsable: string, yo: string): T {
   if (responsable === "libres") return consulta.is("responsable_id", null).in("estado", ESTADOS_ABIERTOS)
   return consulta.eq("responsable_id", responsable === "mias" ? yo : responsable)
 }
 
-// Mismos filtros para la tabla y para los conteos. `omitir` deja fuera el filtro que el conteo
-// desglosa: las pestañas cuentan por estado respetando la búsqueda, el tipo, el origen, la revisión
-// y el responsable.
-function aplicarFiltros<T extends Filtrable<T>>(consulta: T, filtros: Filtros, yo: string, omitir?: Omitible): T {
+// Filtros de la tabla. Los conteos aplican los mismos en conteos_bandeja(): si cambias uno aquí,
+// cámbialo también allá.
+function aplicarFiltros<T extends Filtrable<T>>(consulta: T, filtros: Filtros, yo: string): T {
   let c = consulta
-  if (filtros.estado && omitir !== "estado") c = c.eq("estado", filtros.estado)
-  if (filtros.responsable && omitir !== "responsable") c = filtrarResponsable(c, filtros.responsable, yo)
+  if (filtros.estado) c = c.eq("estado", filtros.estado)
+  if (filtros.responsable) c = filtrarResponsable(c, filtros.responsable, yo)
   if (filtros.tipo) c = c.eq("tipo", filtros.tipo)
   if (filtros.origen) c = c.eq("origen", filtros.origen)
-  if (filtros.porRevisar && omitir !== "revision") c = c.eq("revision", "por_revisar")
+  if (filtros.porRevisar) c = c.eq("revision", "por_revisar")
   if (filtros.q) c = c.or(`asunto.ilike.%${filtros.q}%,descripcion.ilike.%${filtros.q}%`)
   return c
 }
@@ -120,24 +117,37 @@ export default async function BandejaPage({ searchParams }: PageProps<"/gestion"
   const yo = perfil.id
   const supabase = await createClient()
 
-  const conteo = () => supabase.from("solicitudes").select("id", { count: "exact", head: true })
   const otraPersona = filtros.responsable && UUID.test(filtros.responsable) ? filtros.responsable : undefined
-  const [porEstado, revision, mias, libres, persona] = await Promise.all([
-    Promise.all(ESTADOS.map((estado) => aplicarFiltros(conteo(), filtros, yo, "estado").eq("estado", estado))),
-    aplicarFiltros(conteo(), filtros, yo, "revision").eq("revision", "por_revisar"),
-    filtrarResponsable(aplicarFiltros(conteo(), filtros, yo, "responsable"), "mias", yo),
-    filtrarResponsable(aplicarFiltros(conteo(), filtros, yo, "responsable"), "libres", yo),
+  // Todos los conteos (pestañas y chips) en un solo recorrido de la tabla; ver conteos_bandeja().
+  const [resumen, persona] = await Promise.all([
+    supabase
+      .rpc("conteos_bandeja", {
+        p_estado: filtros.estado,
+        p_tipo: filtros.tipo,
+        p_origen: filtros.origen,
+        p_por_revisar: filtros.porRevisar,
+        p_responsable: filtros.responsable === "mias" ? yo : otraPersona,
+        p_solo_libres: filtros.responsable === "libres",
+        p_q: filtros.q || undefined,
+      })
+      .single(),
     otraPersona
       ? supabase.from("perfiles").select("nombre").eq("id", otraPersona).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ])
-  const fallo = [...porEstado, revision, mias, libres, persona].find((r) => r.error)?.error
-  if (fallo) throw fallo
+  if (resumen.error) throw resumen.error
+  if (persona.error) throw persona.error
 
-  const conteos = Object.fromEntries(ESTADOS.map((e, i) => [e, porEstado[i].count ?? 0])) as Record<Estado, number>
+  const conteos: Record<Estado, number> = {
+    pendiente: resumen.data.pendiente,
+    en_proceso: resumen.data.en_proceso,
+    finalizada: resumen.data.finalizada,
+    rechazada: resumen.data.rechazada,
+    retirada: resumen.data.retirada,
+  }
   const todas = ESTADOS.reduce((suma, e) => suma + conteos[e], 0)
   const total = filtros.estado ? conteos[filtros.estado] : todas
-  const porRevisar = revision.count ?? 0
+  const porRevisar = resumen.data.por_revisar
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA))
   const hayFiltros = Boolean(
     filtros.estado || filtros.tipo || filtros.origen || filtros.porRevisar || filtros.responsable || filtros.q
@@ -185,14 +195,14 @@ export default async function BandejaPage({ searchParams }: PageProps<"/gestion"
                 activo={filtros.responsable === "mias"}
                 icono={<UserCheckIcon className="size-3.5" aria-hidden />}
                 etiqueta="Mías"
-                conteo={mias.count ?? 0}
+                conteo={resumen.data.mias}
               />
               <Chip
                 href={alternarResponsable("libres")}
                 activo={filtros.responsable === "libres"}
                 icono={<UserRoundXIcon className="size-3.5" aria-hidden />}
                 etiqueta="Sin asignar"
-                conteo={libres.count ?? 0}
+                conteo={resumen.data.libres}
               />
               {otraPersona && (
                 <Chip
