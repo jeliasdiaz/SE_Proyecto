@@ -16,6 +16,19 @@ export const ETIQUETA_ESTADO: Record<Estado, string> = {
 
 export const ESTADOS = Object.keys(ETIQUETA_ESTADO) as Estado[]
 
+export const ETIQUETA_ROL: Record<Rol, string> = {
+  estudiante: "Estudiante",
+  asesor: "Asesoría",
+  admin: "Administración",
+}
+
+// Personal de la coordinación: atiende la bandeja. Espejo de es_personal() en la base de datos.
+export const ROLES_PERSONAL = ["asesor", "admin"] as const satisfies readonly Rol[]
+
+export function esPersonal(rol: Rol): boolean {
+  return (ROLES_PERSONAL as readonly Rol[]).includes(rol)
+}
+
 // Espejo de validar_cambio_solicitud() en la base de datos. Aquí solo sirve para mostrar
 // las opciones válidas; quien decide es el trigger. El estudiante solo puede pasar su solicitud
 // de pendiente a retirada.
@@ -27,21 +40,29 @@ export const TRANSICIONES: Record<Estado, readonly Estado[]> = {
   retirada: [],
 }
 
-export function puedeTransicionar(de: Estado, a: Estado): boolean {
-  return TRANSICIONES[de].includes(a)
+// Reabrir un caso finalizado o rechazado es exclusivo del admin. Un retiro no se reabre: lo
+// decidió el estudiante.
+export function esReapertura(de: Estado, a: Estado): boolean {
+  return (de === "finalizada" || de === "rechazada") && a === "en_proceso"
 }
 
-// Solo para el admin: el retiro que hace el estudiante no lleva observación.
-export function exigeObservacion(estado: Estado): boolean {
-  return estado === "rechazada" || estado === "retirada"
+export function transicionesPara(estado: Estado, rol: Rol): readonly Estado[] {
+  if (rol === "admin" && esReapertura(estado, "en_proceso")) return ["en_proceso"]
+  return TRANSICIONES[estado]
+}
+
+// Solo para la coordinación: el retiro que hace el estudiante no lleva observación.
+export function exigeObservacion(de: Estado, a: Estado): boolean {
+  return a === "rechazada" || a === "retirada" || esReapertura(de, a)
 }
 
 // Espejo de dias_recordatorio() en la base de datos: días sin cambios para considerar un caso
 // estancado (la vista solicitudes_estancadas y el recordatorio F3 usan el mismo umbral).
 export const DIAS_RECORDATORIO = 3
 
+// No depende de TRANSICIONES: un caso cerrado sigue cerrado aunque el admin pueda reabrirlo.
 export function estaAbierta(estado: Estado): boolean {
-  return TRANSICIONES[estado].length > 0
+  return estado === "pendiente" || estado === "en_proceso"
 }
 
 export const ETIQUETA_TIPO: Record<Tipo, string> = {

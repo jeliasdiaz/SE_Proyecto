@@ -6,6 +6,8 @@
 --
 -- Usuarios (contraseña de todos: Demo12345):
 --   admin@demo.test        administrador
+--   laura.ospina@demo.test asesora
+--   mateo.restrepo@demo.test asesor
 --   ana.gomez@demo.test    estudiante
 --   bruno.diaz@demo.test   estudiante
 --   carla.rios@demo.test   estudiante
@@ -33,6 +35,8 @@ select
   '', '', '', ''
 from (values
   ('00000000-0000-4000-a000-000000000001'::uuid, 'admin@demo.test', 'Coordinación Académica', null),
+  ('00000000-0000-4000-a000-000000000002'::uuid, 'laura.ospina@demo.test', 'Laura Ospina', null),
+  ('00000000-0000-4000-a000-000000000003'::uuid, 'mateo.restrepo@demo.test', 'Mateo Restrepo', null),
   ('00000000-0000-4000-a000-000000000011'::uuid, 'ana.gomez@demo.test', 'Ana Gómez', '100001'),
   ('00000000-0000-4000-a000-000000000012'::uuid, 'bruno.diaz@demo.test', 'Bruno Díaz', '100002'),
   ('00000000-0000-4000-a000-000000000013'::uuid, 'carla.rios@demo.test', 'Carla Ríos', '100003'),
@@ -53,6 +57,7 @@ where u.email like '%@demo.test';
 
 -- El rol de admin solo se asigna por SQL.
 update public.perfiles set rol = 'admin' where correo = 'admin@demo.test';
+update public.perfiles set rol = 'asesor' where correo in ('laura.ospina@demo.test', 'mateo.restrepo@demo.test');
 
 -- 40 solicitudes (R11) con historial en fechas pasadas. Los triggers se desactivan para poder
 -- fechar el historial; por eso aquí se escriben a mano las mismas filas que ellos generarían.
@@ -61,6 +66,11 @@ alter table public.solicitudes disable trigger user;
 do $$
 declare
   v_admin uuid := '00000000-0000-4000-a000-000000000001';
+  v_asesores uuid[] := array[
+    '00000000-0000-4000-a000-000000000002',
+    '00000000-0000-4000-a000-000000000003'
+  ]::uuid[];
+  v_responsable uuid;
   v_estudiantes uuid[] := array[
     '00000000-0000-4000-a000-000000000011',
     '00000000-0000-4000-a000-000000000012',
@@ -156,6 +166,13 @@ begin
     end;
 
     v_rechazo_directo := v_estado = 'rechazada' and i % 2 = 0;
+
+    -- Los casos atendidos se reparten entre los asesores (y alguno el admin). De los pendientes,
+    -- un tercio ya lo tomó un asesor sin moverlo; el resto sigue libre en la bandeja.
+    v_responsable := case
+      when v_estado <> 'pendiente' and i % 7 = 0 then v_admin
+      when v_estado <> 'pendiente' or i % 3 = 0 then v_asesores[(i % 2) + 1]
+    end;
     v_atencion := null;
     v_cierre := null;
     v_nota := null;
@@ -202,7 +219,7 @@ begin
       v_origen,
       v_revision,
       v_motivo,
-      case when v_estado <> 'pendiente' then v_admin end,
+      v_responsable,
       v_creada,
       v_actualizada
     );
@@ -215,7 +232,7 @@ begin
       values (
         v_id, 'pendiente', 'en_proceso',
         case when v_estado = 'en_proceso' then v_nota end,
-        v_admin, v_atencion
+        v_responsable, v_atencion
       );
     end if;
 
@@ -224,7 +241,7 @@ begin
       values (
         v_id,
         case when v_rechazo_directo then 'pendiente' else 'en_proceso' end::public.estado_solicitud,
-        v_estado, v_nota, v_admin, v_cierre
+        v_estado, v_nota, v_responsable, v_cierre
       );
     end if;
   end loop;

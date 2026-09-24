@@ -21,10 +21,11 @@ type Props = {
   origen?: Origen
   estado?: Estado
   porRevisar: boolean
+  responsable?: string
   hayFiltros: boolean
 }
 
-export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros }: Props) {
+export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, responsable, hayFiltros }: Props) {
   const router = useRouter()
   const [pendiente, iniciar] = useTransition()
   const formulario = useRef<HTMLFormElement>(null)
@@ -38,7 +39,7 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
     campo?.focus()
   }, [])
 
-  // Sin JS el formulario hace un GET normal a /admin; con JS se navega sin recargar y solo con los
+  // Sin JS el formulario hace un GET normal a /gestion; con JS se navega sin recargar y solo con los
   // parámetros que tienen valor.
   function enviar(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault()
@@ -48,7 +49,7 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
     }
     campoConFoco = document.activeElement?.getAttribute("name") ?? "q"
     const cadena = parametros.toString()
-    iniciar(() => router.push(cadena ? `/admin?${cadena}` : "/admin", { scroll: false }))
+    iniciar(() => router.push(cadena ? `/gestion?${cadena}` : "/gestion", { scroll: false }))
   }
 
   const aplicar = (evento: React.ChangeEvent<HTMLSelectElement>) => evento.currentTarget.form?.requestSubmit()
@@ -56,7 +57,7 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
   return (
     <form
       ref={formulario}
-      action="/admin"
+      action="/gestion"
       onSubmit={enviar}
       role="search"
       aria-busy={pendiente}
@@ -64,6 +65,7 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
     >
       {estado && <input type="hidden" name="estado" value={estado} />}
       {porRevisar && <input type="hidden" name="revision" value="por_revisar" />}
+      {responsable && <input type="hidden" name="responsable" value={responsable} />}
       <div className="relative col-span-2 sm:min-w-56 sm:flex-1">
         <button
           type="submit"
@@ -112,7 +114,7 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, hayFiltros
       </NativeSelect>
       {hayFiltros && (
         <Button asChild variant="ghost" className="col-span-2 sm:col-auto">
-          <Link href="/admin" scroll={false}>
+          <Link href="/gestion" scroll={false}>
             Limpiar
           </Link>
         </Button>

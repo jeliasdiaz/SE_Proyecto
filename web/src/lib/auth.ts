@@ -22,15 +22,23 @@ export const getPerfil = cache(async (): Promise<Perfil | null> => {
   return perfil
 })
 
+const INICIO: Record<Rol, string> = {
+  estudiante: "/mis-solicitudes",
+  asesor: "/gestion",
+  admin: "/admin",
+}
+
 export function inicioPorRol(rol: Rol): string {
-  return rol === "admin" ? "/admin" : "/mis-solicitudes"
+  return INICIO[rol]
 }
 
 // Verificación real de acceso para páginas y Server Actions (el proxy solo redirige).
-export async function requerirPerfil(rol?: Rol): Promise<Perfil> {
+// Acepta un rol o la lista de roles permitidos.
+export async function requerirPerfil(roles?: Rol | readonly Rol[]): Promise<Perfil> {
   const perfil = await getPerfil()
   if (!perfil) redirect("/login?error=sesion")
-  if (rol && perfil.rol !== rol) redirect(inicioPorRol(perfil.rol))
+  const permitidos: readonly Rol[] | undefined = typeof roles === "string" ? [roles] : roles
+  if (permitidos && !permitidos.includes(perfil.rol)) redirect(inicioPorRol(perfil.rol))
   return perfil
 }
 

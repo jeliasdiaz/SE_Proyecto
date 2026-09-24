@@ -6,18 +6,23 @@
 --   1. Crea tu usuario en Authentication → Users → Add user, con "Auto Confirm User".
 --   2. Hazlo admin: update public.perfiles set rol = 'admin' where correo = 'tu-correo';
 --   3. (Opcional) Crea igual una cuenta de estudiante de prueba: también recibe solicitudes.
+--   4. (Opcional) Crea las cuentas de los asesores y dales el rol, aquí o desde /admin/usuarios:
+--        update public.perfiles set rol = 'asesor' where correo in ('asesor1@...', 'asesor2@...');
 --
 -- Qué hace:
 --   - Crea 4 estudiantes sintéticos (@demo.test) con contraseña aleatoria: nadie puede entrar
 --     con ellos y .test no recibe correos, así que tampoco se pueden recuperar.
 --   - Reparte 40 solicitudes (R11) con historial entre TODOS los estudiantes existentes.
---   - El admin real queda como responsable de las solicitudes atendidas.
+--   - Las solicitudes atendidas se reparten entre los asesores; si no hay ninguno, quedan a nombre
+--     del admin.
 -- Todos los datos son sintéticos (R6). Todo va en un solo bloque: si falla, no cambia nada.
 -- ============================================================================================
 
 do $$
 declare
   v_admin uuid;
+  v_personal uuid[];
+  v_responsable uuid;
   v_estudiantes uuid[];
   v_tipos public.tipo_solicitud[] := array[
     'homologacion', 'cancelacion_extemporanea', 'supletorio', 'reingreso', 'comite_curricular',
@@ -55,6 +60,8 @@ begin
   if v_admin is null then
     raise exception 'No hay ningún admin: crea tu usuario y asígnale rol admin antes de correr este seed.';
   end if;
+  select coalesce(array_agg(id order by creado), array[v_admin]) into v_personal
+  from public.perfiles where rol = 'asesor';
   if exists (select 1 from public.solicitudes) then
     raise exception 'Ya hay solicitudes: este seed es solo para una base vacía.';
   end if;
@@ -164,6 +171,7 @@ begin
     end;
 
     v_rechazo_directo := v_estado = 'rechazada' and i % 2 = 0;
+    v_responsable := v_personal[(i % array_length(v_personal, 1)) + 1];
     v_atencion := null;
     v_cierre := null;
     v_nota := null;
@@ -210,7 +218,7 @@ begin
       v_origen,
       v_revision,
       v_motivo,
-      case when v_estado <> 'pendiente' then v_admin end,
+      case when v_estado <> 'pendiente' then v_responsable end,
       v_creada,
       v_actualizada
     );
@@ -223,7 +231,7 @@ begin
       values (
         v_id, 'pendiente', 'en_proceso',
         case when v_estado = 'en_proceso' then v_nota end,
-        v_admin, v_atencion
+        v_responsable, v_atencion
       );
     end if;
 
@@ -232,7 +240,7 @@ begin
       values (
         v_id,
         case when v_rechazo_directo then 'pendiente' else 'en_proceso' end::public.estado_solicitud,
-        v_estado, v_nota, v_admin, v_cierre
+        v_estado, v_nota, v_responsable, v_cierre
       );
     end if;
   end loop;
