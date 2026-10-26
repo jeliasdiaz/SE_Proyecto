@@ -1,0 +1,104 @@
+{
+  "id": "KFHt4aD0YlAJMrYr",
+  "name": "F4 - Lectura IMAP (seccion 22)",
+  "nodes": [
+    {
+      "parameters": {
+        "format": "resolved",
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\"]",
+          "forceReconnect": 5,
+          "trackLastMessageId": true
+        }
+      },
+      "id": "0382b66b-c715-4764-9059-c40a5f3aab92",
+      "name": "Recibir correos nuevos",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.1,
+      "position": [
+        -288,
+        240
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "imap": {
+          "id": "2vTqZAa5Pt6Aa0s3",
+          "name": "IMAP - Proyecto SE"
+        }
+      },
+      "notes": "Seleccionar la credencial IMAP del proyecto antes de activar. Escucha continua; forceReconnect es reconexion, no polling. Marca como leido al recibir, antes de ejecutar los siguientes nodos."
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item, index) => {\n  const mail = item.json;\n  const string = (value) => typeof value === 'string' ? value : '';\n  const remitentes = (Array.isArray(mail.from?.value) ? mail.from.value : [])\n    .map((entry) => ({ nombre: string(entry?.name), correo: string(entry?.address).trim().toLowerCase() }))\n    .filter((entry) => entry.correo);\n  const texto = string(mail.text);\n  const html = string(mail.html);\n  const adjuntos = Object.entries(item.binary ?? {}).map(([propiedad, archivo]) => ({\n    propiedad_binaria: propiedad,\n    nombre: archivo.fileName ?? null,\n    mime_type: archivo.mimeType ?? null,\n    tamano: archivo.fileSize ?? null\n  }));\n  const resultado = {\n    json: {\n      origen: 'correo',\n      message_id: string(mail.messageId).trim() || null,\n      imap_uid: mail.attributes?.uid ?? null,\n      remitente: remitentes.length === 1 ? remitentes[0] : null,\n      remitentes,\n      remitente_original: string(mail.from?.text),\n      asunto: string(mail.subject),\n      cuerpo: { texto, html },\n      fecha_correo: mail.date ?? null,\n      tiene_adjuntos: adjuntos.length > 0,\n      cantidad_adjuntos: adjuntos.length,\n      adjuntos\n    },\n    pairedItem: { item: index }\n  };\n  if (item.binary) resultado.binary = item.binary;\n  return resultado;\n});"
+      },
+      "id": "284724ca-9c6f-4f6d-8bfb-ce34080cb91d",
+      "name": "Extraer datos del correo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        240
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a3562ac3-f0d6-4836-abbd-08aba1b8e788",
+      "name": "Fin seccion 22 - Correo leido",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        320,
+        240
+      ],
+      "notesInFlow": true,
+      "notes": "Punto de continuacion de F4. La seccion 23 implementara correo a caso; esta version solo lee y expone los datos."
+    },
+    {
+      "parameters": {
+        "content": "## F4 · Sección 22: lectura IMAP\nResponsable: Santiago · 2026-09-23\n\nImportar, asignar credencial y probar antes de activar/publicar.\nEntrada → datos del correo y adjuntos → fin de esta sección.\n\nUNSEEN + marcar leído + seguimiento de UID.\nEscucha continua con reconexión cada 5 min (no es cron).\nResolved incluye adjuntos binarios, también imágenes inline.\n\nPendiente: validar versión, buzón y prueba real.\nGuía: n8n/README.md",
+        "height": 340,
+        "width": 760
+      },
+      "id": "2b95aadb-e79b-4b1e-ab41-3f6b12374a37",
+      "name": "Alcance y configuracion",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -160
+      ]
+    }
+  ],
+  "connections": {
+    "Recibir correos nuevos": {
+      "main": [
+        [
+          {
+            "node": "Extraer datos del correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer datos del correo": {
+      "main": [
+        [
+          {
+            "node": "Fin seccion 22 - Correo leido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": [],
+  "active": false,
+  "pinData": {}
+}

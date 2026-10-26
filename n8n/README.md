@@ -16,7 +16,7 @@ Antes de hacer commit, revisar que el JSON no contenga secretos: las credenciale
 | [`F1-registro.json`](F1-registro.json) | #19 | Abel | Webhook `f1-registro` (INSERT en `solicitudes`) |
 | [`F2-cambio-estado.json`](F2-cambio-estado.json) | #20 | Abel | Webhook `f2-cambio-estado` (UPDATE en `solicitudes`) |
 | `F3-recordatorio.json` | #21 | Santiago | Programado |
-| `F4-correo-a-caso.json` | #22, #23 | Santiago | IMAP |
+| [`F4-correo-a-caso.json`](F4-correo-a-caso.json) | #22, #23 | Santiago | IMAP (por ahora solo la lectura, #22) |
 | [`Enviar-aviso.json`](Enviar-aviso.json) | — | Abel | Subflujo: lo llaman otros flujos |
 
 **Enviar-aviso** envía un correo y registra el envío en `avisos_enviados`, también cuando falla
