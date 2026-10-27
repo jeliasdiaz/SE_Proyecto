@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:db": "docker exec -i supabase_db_SE_Proyecto psql -U postgres -v ON_ERROR_STOP=1 < ../supabase/snippets/prueba-roles.sql",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

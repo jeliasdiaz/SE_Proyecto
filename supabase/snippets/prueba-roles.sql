@@ -193,6 +193,33 @@ select pg_temp.vale('27 el estudiante no ve perfiles ajenos', 'select count(*) f
 select pg_temp.vale('28 el estudiante no ve métricas', 'select count(*) from public.carga_por_asesor', '0');
 select pg_temp.falla('29 el estudiante no cambia roles',
   format($q$select public.cambiar_rol(%L, 'asesor')$q$, :'ana'), 'Solo un administrador');
+-- Registrar: la base pone estudiante, estado y origen; el trigger deja la creación en el historial.
+insert into public.solicitudes (tipo, asunto, descripcion)
+values ('reingreso', 'Prueba de reingreso', 'Solicito reingreso para el próximo semestre.')
+returning id as nueva \gset
+select pg_temp.vale('30 la solicitud nueva queda pendiente, por web y a su nombre',
+  format($q$select estado || '/' || origen || '/' || (estudiante_id = auth.uid()) from public.solicitudes where id = %L$q$, :'nueva'),
+  'pendiente/web/true');
+select pg_temp.vale('30b la creación queda en el historial',
+  format($q$select count(*) from public.historial_estados where solicitud_id = %L and estado_anterior is null$q$, :'nueva'), '1');
+select pg_temp.falla('31 el estudiante no fija el estado al registrar',
+  $q$insert into public.solicitudes (tipo, asunto, descripcion, estado) values ('otro', 'Prueba', 'Prueba de permisos', 'finalizada')$q$,
+  'permission denied');
+select pg_temp.falla('32 el estudiante no registra a nombre de otro',
+  format($q$insert into public.solicitudes (estudiante_id, tipo, asunto, descripcion) values (%L, 'otro', 'Prueba', 'Prueba de permisos')$q$, :'ana'),
+  'permission denied');
+select pg_temp.falla('33 el estudiante no reclasifica la suya',
+  format($q$update public.solicitudes set tipo = 'otro' where id = %L$q$, :'nueva'), 'Solo puedes retirar');
+select pg_temp.filas('34 el estudiante no retira una ajena',
+  format($q$update public.solicitudes set estado = 'retirada' where id = %L$q$, :'de_ana'), 0);
+select pg_temp.filas('35 el estudiante retira la suya pendiente',
+  format($q$update public.solicitudes set estado = 'retirada' where id = %L$q$, :'nueva'), 1);
+select pg_temp.vale('35b el retiro queda en el historial a su nombre',
+  format($q$select count(*) from public.historial_estados where solicitud_id = %L and estado_nuevo = 'retirada' and usuario_id = auth.uid()$q$, :'nueva'), '1');
+-- Ya no está pendiente: la política de retiro no la alcanza.
+select pg_temp.filas('36 una solicitud retirada no se reabre',
+  format($q$update public.solicitudes set estado = 'pendiente' where id = %L$q$, :'nueva'), 0);
+select pg_temp.vale('37 el estudiante no ve los avisos enviados', 'select count(*) from public.avisos_enviados', '0');
 
 reset role;
 rollback;
