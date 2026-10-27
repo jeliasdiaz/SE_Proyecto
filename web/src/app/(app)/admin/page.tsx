@@ -73,11 +73,13 @@ export default async function CargaEquipoPage() {
   const estancadas = estancadasAsignadas + estancadasSinAsignar
 
   const promedio = personas.length > 0 ? abiertasAsignadas / personas.length : 0
-  const masCargada = personas[0]
+  const [masCargada, segunda] = personas
+  // Con un empate en el primer lugar nadie "concentra" los casos: el aviso nombraría a una sola.
   const desbalance =
     personas.length >= 2 &&
     abiertasAsignadas >= MINIMO_PARA_AVISAR &&
-    masCargada.abiertas >= promedio * FACTOR_DESBALANCE
+    masCargada.abiertas >= promedio * FACTOR_DESBALANCE &&
+    masCargada.abiertas > segunda.abiertas
       ? masCargada
       : null
   const ahora = new Date()

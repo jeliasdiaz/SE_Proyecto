@@ -32,11 +32,19 @@ export function inicioPorRol(rol: Rol): string {
   return INICIO[rol]
 }
 
+// Con sesión pero sin perfil (cuenta creada antes del trigger al_confirmar_correo o perfil borrado):
+// el login muestra el aviso en vez de devolverla al inicio, que la mandaría otra vez aquí.
+export async function destinoSinPerfil(): Promise<string> {
+  const supabase = await createClient()
+  const { data } = await supabase.auth.getClaims()
+  return data?.claims ? "/login?error=perfil" : "/login?error=sesion"
+}
+
 // Verificación real de acceso para páginas y Server Actions (el proxy solo redirige).
 // Acepta un rol o la lista de roles permitidos.
 export async function requerirPerfil(roles?: Rol | readonly Rol[]): Promise<Perfil> {
   const perfil = await getPerfil()
-  if (!perfil) redirect("/login?error=sesion")
+  if (!perfil) redirect(await destinoSinPerfil())
   const permitidos: readonly Rol[] | undefined = typeof roles === "string" ? [roles] : roles
   if (permitidos && !permitidos.includes(perfil.rol)) redirect(inicioPorRol(perfil.rol))
   return perfil

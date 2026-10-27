@@ -1,7 +1,23 @@
 {
   "id": "KFHt4aD0YlAJMrYr",
-  "name": "F4 - Lectura IMAP (seccion 22)",
+  "name": "F4-correo-a-caso",
   "nodes": [
+    {
+      "id": "nota-proposito",
+      "name": "Propósito",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -260
+      ],
+      "parameters": {
+        "content": "## F4-correo-a-caso — Correo a caso (#22, #23)\n**Propósito:** convertir en solicitud cada correo que llega al buzón del proyecto, sin transcribirlo.\n- Remitente con cuenta de estudiante → crea la solicitud con `origen = correo`. El INSERT dispara F1, que le confirma al estudiante y avisa a la coordinación.\n- El tipo sale de palabras clave. Si no es claro o hay varios, queda **por revisar** con el motivo: la automatización no decide (#28).\n- Guarda un adjunto (PDF, JPG o PNG de hasta 10 MB; prefiere el PDF) en el bucket `adjuntos`. Lo que no guarda queda anotado en el motivo.\n- Remitente sin cuenta de estudiante → le responde cómo registrarse y no crea nada (`remitente_desconocido`). Rebotes y respuestas automáticas se ignoran.\n\n**Disparador:** IMAP, correos no leídos (los marca como leídos al recibirlos).\n**Variables:** `APP_URL`, `CORREO_REMITENTE` y `SUPABASE_URL` (para subir el adjunto).\n\n**Dueños:** Santiago (lectura, #22) · Abel (correo a caso, #23)\n**Fecha:** 2026-10-26",
+        "height": 440,
+        "width": 620,
+        "color": 7
+      }
+    },
     {
       "parameters": {
         "format": "resolved",
@@ -22,11 +38,11 @@
       "notesInFlow": true,
       "credentials": {
         "imap": {
-          "id": "2vTqZAa5Pt6Aa0s3",
-          "name": "IMAP - Proyecto SE"
+          "id": "seImapLocal00001",
+          "name": "Buzón IMAP local (GreenMail)"
         }
       },
-      "notes": "Seleccionar la credencial IMAP del proyecto antes de activar. Escucha continua; forceReconnect es reconexion, no polling. Marca como leido al recibir, antes de ejecutar los siguientes nodos."
+      "notes": "En Azure, elegir la credencial IMAP del proyecto. Escucha continua; forceReconnect es reconexión, no polling. Marca como leído al recibir, antes de ejecutar los siguientes nodos."
     },
     {
       "parameters": {
@@ -42,32 +58,213 @@
       ]
     },
     {
-      "parameters": {},
-      "id": "a3562ac3-f0d6-4836-abbd-08aba1b8e788",
-      "name": "Fin seccion 22 - Correo leido",
-      "type": "n8n-nodes-base.noOp",
+      "id": "buscar-perfiles",
+      "name": "Buscar perfiles",
+      "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        320,
+        240,
         240
       ],
-      "notesInFlow": true,
-      "notes": "Punto de continuacion de F4. La seccion 23 implementara correo a caso; esta version solo lee y expone los datos."
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "perfiles",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "correo=not.is.null"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "seSupabaseLocal1",
+          "name": "Supabase local"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
     },
     {
+      "id": "preparar-casos",
+      "name": "Preparar casos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        240
+      ],
       "parameters": {
-        "content": "## F4 · Sección 22: lectura IMAP\nResponsable: Santiago · 2026-09-23\n\nImportar, asignar credencial y probar antes de activar/publicar.\nEntrada → datos del correo y adjuntos → fin de esta sección.\n\nUNSEEN + marcar leído + seguimiento de UID.\nEscucha continua con reconexión cada 5 min (no es cron).\nResolved incluye adjuntos binarios, también imágenes inline.\n\nPendiente: validar versión, buzón y prueba real.\nGuía: n8n/README.md",
-        "height": 340,
-        "width": 760
+        "jsCode": "// Decide qué hacer con cada correo: crear la solicitud (remitente con cuenta de estudiante) o\n// responderle cómo registrarse. La automatización no decide el trámite: si el tipo no es claro, la\n// solicitud queda por revisar con el motivo y una persona lo confirma (#28).\nconst correos = $('Extraer datos del correo').all();\nconst perfiles = $('Buscar perfiles').all().map((item) => item.json).filter((perfil) => perfil.correo);\nconst porCorreo = new Map(perfiles.map((perfil) => [perfil.correo.toLowerCase(), perfil]));\nconst app = $env.APP_URL.replace(/\\/$/, '');\n// CORREO_REMITENTE es \"Nombre <correo>\" o solo el correo: es el buzón del proyecto.\nconst remitenteProyecto = $env.CORREO_REMITENTE ?? '';\nconst buzon = (remitenteProyecto.match(/<([^>]+)>/)?.[1] ?? remitenteProyecto).trim().toLowerCase();\n\n// Palabras clave sobre el texto sin tildes. Espejo de ETIQUETA_TIPO (web/src/lib/dominio.ts).\nconst REGLAS = [\n  ['homologacion', /homolog/],\n  ['cancelacion_extemporanea', /cancel/],\n  ['supletorio', /supletori/],\n  ['reingreso', /reingres|reintegr/],\n  ['comite_curricular', /comite|prerrequisit|practica empresarial|enfasis/],\n];\nconst TIPOS = {\n  homologacion: 'Homologación',\n  cancelacion_extemporanea: 'Cancelación extemporánea',\n  supletorio: 'Supletorio',\n  reingreso: 'Reingreso',\n  comite_curricular: 'Solicitud al comité curricular',\n};\n\n// Mismas reglas que el bucket `adjuntos` y que nombreArchivoSeguro() de la web.\nconst PERMITIDOS = ['application/pdf', 'image/jpeg', 'image/png'];\nconst TAMANO_MAXIMO = 10 * 1024 * 1024;\n\nconst sinTildes = (texto) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();\nconst tiposEn = (texto) => REGLAS.filter(([, regla]) => regla.test(sinTildes(texto))).map(([tipo]) => tipo);\nconst esc = (texto) => String(texto ?? '').replace(/[&<>\"']/g, (c) =>\n  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]);\nconst nombreSeguro = (nombre) =>\n  nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9._-]+/g, '-')\n    .replace(/-+/g, '-').replace(/^[-.]+/, '').slice(-100) || 'adjunto';\n// n8n describe el tamaño como texto (\"1.2 MB\"); si no se entiende, el bucket tiene la última palabra.\nconst bytes = (tamano) => {\n  const partes = String(tamano ?? '').match(/^([\\d.]+)\\s*(B|kB|KB|MB|GB)$/);\n  if (!partes) return 0;\n  return Number(partes[1]) * { B: 1, kB: 1e3, KB: 1e3, MB: 1e6, GB: 1e9 }[partes[2]];\n};\nconst uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = Math.floor(Math.random() * 16);\n  return (c === 'x' ? r : (r % 4) + 8).toString(16);\n});\nconst textoPlano = (html) => html.replace(/<(style|script)[\\s\\S]*?<\\/\\1>/gi, ' ').replace(/<br\\s*\\/?>|<\\/p>/gi, '\\n')\n  .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/[ \\t]+/g, ' ');\n\nconst salida = [];\n\nfor (const item of correos) {\n  const correo = item.json;\n  const remitente = correo.remitente?.correo ?? '';\n  // Sin un remitente único, del propio buzón o automático (rebotes, \"no responder\"): se ignora, para\n  // no contestarle a una máquina en un ciclo.\n  if (!remitente || remitente === buzon || /^(mailer-daemon|postmaster|no-?reply)@/.test(remitente)) continue;\n\n  const perfil = porCorreo.get(remitente);\n  const asuntoOriginal = correo.asunto.trim();\n\n  if (perfil?.rol !== 'estudiante') {\n    const explicacion = perfil\n      ? 'pertenece al personal de la coordinación. Las solicitudes por correo solo se reciben de cuentas de estudiante.'\n      : `no corresponde a ninguna cuenta de estudiante. Crea tu cuenta con este mismo correo en <a href=\"${app}/registro\">${app}/registro</a> y vuelve a enviarla, o regístrala directamente en la web.`;\n    salida.push({\n      json: {\n        accion: 'responder',\n        solicitud_id: null,\n        tipo_aviso: 'remitente_desconocido',\n        destinatario: remitente,\n        asunto: 'No pudimos registrar tu solicitud - Gestión de Solicitudes',\n        cuerpo: `<h2>No pudimos registrar tu solicitud</h2>\n<p>Recibimos tu correo${asuntoOriginal ? ` «${esc(asuntoOriginal)}»` : ''}, pero no creamos ninguna solicitud: la dirección ${esc(remitente)} ${explicacion}</p>`,\n      },\n      pairedItem: { item: 0 },\n    });\n    continue;\n  }\n\n  const motivos = [];\n  const texto = (correo.cuerpo.texto || textoPlano(correo.cuerpo.html))\n    .replace(/\\r\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\n  if (!texto) motivos.push('El correo llegó sin texto.');\n\n  // Un solo trámite en todo el correo: ese. Varios: el del asunto si es uno, por revisar igual.\n  const enAsunto = tiposEn(asuntoOriginal);\n  const enTodo = tiposEn(`${asuntoOriginal}\\n${texto}`);\n  let tipo = 'otro';\n  if (enTodo.length === 1) {\n    tipo = enTodo[0];\n  } else if (enTodo.length === 0) {\n    motivos.push('No se pudo identificar el tipo de trámite en el correo.');\n  } else {\n    if (enAsunto.length === 1) tipo = enAsunto[0];\n    motivos.push(`El correo menciona varios trámites (${enTodo.map((t) => TIPOS[t]).join(', ')}): confirma el tipo.`);\n  }\n\n  // Un adjunto por solicitud, como en la web. Se prefiere un PDF; las imágenes que sobran suelen ser\n  // firmas o logos incrustados y no se mencionan. Lo demás que no se guarda queda en el motivo.\n  const adjuntos = correo.adjuntos ?? [];\n  const validos = adjuntos.filter((a) => PERMITIDOS.includes(a.mime_type) && bytes(a.tamano) <= TAMANO_MAXIMO);\n  const elegido = validos.find((a) => a.mime_type === 'application/pdf') ?? validos[0] ?? null;\n  const descartados = adjuntos.filter((a) => a !== elegido && !(validos.includes(a) && a.mime_type.startsWith('image/')));\n  if (descartados.length) {\n    motivos.push(`No se guardó: ${descartados.map((a) => a.nombre ?? 'adjunto sin nombre').join(', ')} (solo un PDF, JPG o PNG de hasta 10 MB).`);\n  }\n\n  const id = uuid();\n  const ruta = elegido ? `${perfil.id}/${id}/${nombreSeguro(elegido.nombre ?? 'adjunto')}` : null;\n  salida.push({\n    json: {\n      accion: 'crear',\n      // Fila de `solicitudes`. El id va desde aquí porque la ruta del adjunto lo incluye\n      // (restricción adjunto_en_carpeta_propia) y el archivo se sube antes del INSERT, que dispara F1.\n      fila: {\n        id,\n        estudiante_id: perfil.id,\n        tipo,\n        asunto: (asuntoOriginal || texto.split('\\n')[0] || 'Solicitud recibida por correo').slice(0, 200),\n        descripcion: (texto || '(El correo llegó sin texto.)').slice(0, 20000),\n        adjunto_path: ruta,\n        origen: 'correo',\n        revision: motivos.length ? 'por_revisar' : 'ok',\n        motivo_revision: motivos.length ? motivos.join(' ').slice(0, 500) : null,\n      },\n      adjunto: elegido ? { ruta, mime_type: elegido.mime_type } : null,\n    },\n    ...(elegido ? { binary: { adjunto: item.binary[elegido.propiedad_binaria] } } : {}),\n    pairedItem: { item: 0 },\n  });\n}\n\nreturn salida;\n"
+      }
+    },
+    {
+      "id": "es-estudiante",
+      "name": "¿Es estudiante?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        680,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "es-estudiante-condicion",
+              "leftValue": "={{ $json.accion }}",
+              "rightValue": "crear",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "trae-adjunto",
+      "name": "¿Trae adjunto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        900,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "trae-adjunto-condicion",
+              "leftValue": "={{ $json.adjunto !== null }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "subir-adjunto",
+      "name": "Subir adjunto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        40
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL.replace(/\\/$/, '') }}/storage/v1/object/adjuntos/{{ $json.adjunto.ruta }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "={{ $json.adjunto.mime_type }}"
+            },
+            {
+              "name": "x-upsert",
+              "value": "false"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "adjunto",
+        "options": {}
       },
-      "id": "2b95aadb-e79b-4b1e-ab41-3f6b12374a37",
-      "name": "Alcance y configuracion",
-      "type": "n8n-nodes-base.stickyNote",
+      "credentials": {
+        "supabaseApi": {
+          "id": "seSupabaseLocal1",
+          "name": "Supabase local"
+        }
+      }
+    },
+    {
+      "id": "armar-fila",
+      "name": "Armar fila",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        140
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// La fila que armó 'Preparar casos' (la respuesta de Storage reemplazó el json del ítem).\nreturn { json: $('Preparar casos').item.json.fila };\n"
+      }
+    },
+    {
+      "id": "crear-solicitud",
+      "name": "Crear solicitud",
+      "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -352,
-        -160
-      ]
+        1560,
+        140
+      ],
+      "parameters": {
+        "operation": "create",
+        "tableId": "solicitudes",
+        "dataToSend": "autoMapInputData"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "seSupabaseLocal1",
+          "name": "Supabase local"
+        }
+      }
+    },
+    {
+      "id": "responder-remitente",
+      "name": "Responder al remitente",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        400
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "seEnviarAviso001",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
     }
   ],
   "connections": {
@@ -86,7 +283,87 @@
       "main": [
         [
           {
-            "node": "Fin seccion 22 - Correo leido",
+            "node": "Buscar perfiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar perfiles": {
+      "main": [
+        [
+          {
+            "node": "Preparar casos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar casos": {
+      "main": [
+        [
+          {
+            "node": "¿Es estudiante?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es estudiante?": {
+      "main": [
+        [
+          {
+            "node": "¿Trae adjunto?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder al remitente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Trae adjunto?": {
+      "main": [
+        [
+          {
+            "node": "Subir adjunto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Armar fila",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir adjunto": {
+      "main": [
+        [
+          {
+            "node": "Armar fila",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar fila": {
+      "main": [
+        [
+          {
+            "node": "Crear solicitud",
             "type": "main",
             "index": 0
           }
@@ -96,9 +373,12 @@
   },
   "settings": {
     "executionOrder": "v1",
+    "timezone": "America/Bogota",
+    "callerPolicy": "workflowsFromSameOwner",
     "binaryMode": "separate"
   },
   "tags": [],
   "active": false,
-  "pinData": {}
+  "pinData": {},
+  "description": ""
 }

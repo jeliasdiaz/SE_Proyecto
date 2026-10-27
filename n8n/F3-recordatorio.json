@@ -1,0 +1,250 @@
+{
+  "id": "seF3Recordator01",
+  "name": "F3-recordatorio",
+  "description": "",
+  "nodes": [
+    {
+      "id": "nota-proposito",
+      "name": "Propósito",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        -160
+      ],
+      "parameters": {
+        "content": "## F3-recordatorio — Recordatorio de casos estancados (#21)\n**Propósito:** avisar a cada responsable de sus solicitudes abiertas que llevan 3 días o más sin cambios (las que no tienen responsable, a los administradores). Un correo de resumen por persona.\n\n**Disparador:** todos los días a las 8:00 (America/Bogota). *Ejecutar ahora* sirve para probarlo o mostrarlo en la demo.\n\n**Sin duplicados:** una solicitud no se vuelve a recordar hasta 3 días después (consulta `avisos_enviados`). No usa la vista `solicitudes_estancadas`: con la llave secreta `es_admin()` es falso y la vista devuelve vacío.\n\n**Aviso:** `recordatorio` (vía subflujo *Enviar-aviso*, una fila por solicitud).\n\n**Dueño:** Abel\n**Fecha:** 2026-10-26",
+        "height": 400,
+        "width": 420,
+        "color": 7
+      }
+    },
+    {
+      "id": "todos-los-dias",
+      "name": "Todos los días a las 8:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -80
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ejecutar-ahora",
+      "name": "Ejecutar ahora",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "buscar-estancadas",
+      "name": "Buscar estancadas",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "solicitudes",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "=estado=in.(pendiente,en_proceso)&actualizada=lt.{{ $now.minus({ days: 3 }).toUTC().toISO() }}"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "seSupabaseLocal1",
+          "name": "Supabase local"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "buscar-personal",
+      "name": "Buscar personal",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "perfiles",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "rol=in.(asesor,admin)"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "seSupabaseLocal1",
+          "name": "Supabase local"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "recordatorios-recientes",
+      "name": "Recordatorios recientes",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        0
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "avisos_enviados",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "=tipo_aviso=eq.recordatorio&resultado=eq.enviada&fecha=gt.{{ $now.minus({ hours: 71 }).toUTC().toISO() }}"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "seSupabaseLocal1",
+          "name": "Supabase local"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "armar-recordatorios",
+      "name": "Armar recordatorios",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Un resumen por persona con sus solicitudes abiertas que llevan DIAS días o más sin cambios. Las que\n// no tienen responsable van a todos los administradores. Una solicitud no se vuelve a recordar hasta\n// que pasen otros DIAS días: 'Recordatorios recientes' trae los ya enviados.\nconst DIAS = 3; // Espejo de dias_recordatorio() en la base. Las consultas de arriba usan el mismo valor.\nconst app = $env.APP_URL.replace(/\\/$/, '');\nconst ahora = Date.now();\n\nconst solicitudes = $('Buscar estancadas').all().map((item) => item.json).filter((s) => s.id);\nconst personal = $('Buscar personal').all().map((item) => item.json).filter((p) => p.id && p.correo);\nconst recordadas = new Set($('Recordatorios recientes').all().map((item) => item.json.solicitud_id).filter(Boolean));\nconst porId = new Map(personal.map((p) => [p.id, p]));\nconst admins = personal.filter((p) => p.rol === 'admin');\n\n// Espejo de ETIQUETA_ESTADO (web/src/lib/dominio.ts); solo los estados abiertos.\nconst ESTADOS = { pendiente: 'Pendiente', en_proceso: 'En proceso' };\nconst esc = (texto) => String(texto ?? '').replace(/[&<>\"']/g, (c) =>\n  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]);\n// Mismo cálculo que dias_sin_cambio en la vista solicitudes_estancadas.\nconst diasSinCambio = (s) => Math.floor((ahora - new Date(s.actualizada).getTime()) / 86400000);\n\nconst resumenes = new Map();\nfor (const solicitud of solicitudes) {\n  if (recordadas.has(solicitud.id)) continue;\n  const responsable = porId.get(solicitud.responsable_id);\n  for (const persona of responsable ? [responsable] : admins) {\n    if (!resumenes.has(persona.id)) resumenes.set(persona.id, { persona, casos: [] });\n    resumenes.get(persona.id).casos.push({ ...solicitud, libre: !responsable });\n  }\n}\n\nreturn [...resumenes.values()].map(({ persona, casos }) => {\n  casos.sort((a, b) => diasSinCambio(b) - diasSinCambio(a));\n  const n = casos.length;\n  const filas = casos.map((c) =>\n    `  <li><a href=\"${app}/gestion/solicitudes/${c.id}\">${esc(c.asunto)}</a> · ${esc(ESTADOS[c.estado] ?? c.estado)} · ${diasSinCambio(c)} días sin cambios${c.libre ? ' · <strong>sin responsable</strong>' : ''}</li>`\n  ).join('\\n');\n  return {\n    json: {\n      // Un correo cubre varias solicitudes: Enviar-aviso registra una fila por cada una.\n      solicitud_id: null,\n      solicitud_ids: casos.map((c) => c.id),\n      tipo_aviso: 'recordatorio',\n      destinatario: persona.correo,\n      asunto: `Recordatorio: ${n === 1 ? '1 solicitud lleva' : `${n} solicitudes llevan`} ${DIAS} días o más sin cambios - Gestión de Solicitudes`,\n      cuerpo: `<h2>Solicitudes sin movimiento</h2>\n<p>Hola ${esc(persona.nombre)},</p>\n<p>${n === 1 ? 'Esta solicitud lleva' : 'Estas solicitudes llevan'} ${DIAS} días o más sin cambios:</p>\n<ul>\n${filas}\n</ul>\n<p><a href=\"${app}/gestion\">Abrir la bandeja</a></p>`,\n    },\n  };\n});\n"
+      }
+    },
+    {
+      "id": "enviar-recordatorios",
+      "name": "Enviar recordatorios",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "seEnviarAviso001",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Todos los días a las 8:00": {
+      "main": [
+        [
+          {
+            "node": "Buscar estancadas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar ahora": {
+      "main": [
+        [
+          {
+            "node": "Buscar estancadas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar estancadas": {
+      "main": [
+        [
+          {
+            "node": "Buscar personal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar personal": {
+      "main": [
+        [
+          {
+            "node": "Recordatorios recientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recordatorios recientes": {
+      "main": [
+        [
+          {
+            "node": "Armar recordatorios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar recordatorios": {
+      "main": [
+        [
+          {
+            "node": "Enviar recordatorios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [],
+  "active": false,
+  "pinData": {}
+}

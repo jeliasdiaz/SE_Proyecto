@@ -8,6 +8,8 @@ export const metadata: Metadata = { title: "Iniciar sesión" }
 const MENSAJES_ERROR: Record<string, string> = {
   sesion: "Tu sesión terminó. Vuelve a iniciar sesión.",
   enlace: "El enlace no es válido o ya expiró. Pide uno nuevo.",
+  perfil:
+    "Tu cuenta no tiene un perfil activo. Si acabas de registrarte, abre el enlace de confirmación; si sigue igual, escríbele a la coordinación.",
 }
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {

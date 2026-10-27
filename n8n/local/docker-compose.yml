@@ -23,8 +23,10 @@ services:
       N8N_PERSONALIZATION_ENABLED: "false"
       # Los flujos leen su configuración de despliegue con $env (en Azure se definen las mismas).
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
-      APP_URL: ${APP_URL:-http://localhost:3000}
+      APP_URL: ${APP_URL:-http://127.0.0.1:3000}
       CORREO_REMITENTE: ${SMTP_REMITENTE:?Falta SMTP_REMITENTE en n8n/.env}
+      # F4 sube los adjuntos a Storage por HTTP: necesita la URL de la API (la llave va en la credencial).
+      SUPABASE_URL: ${SUPABASE_URL:?Falta SUPABASE_URL en n8n/.env}
     volumes:
       - n8n_datos:/home/node/.n8n
     networks:
