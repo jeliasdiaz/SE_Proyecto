@@ -53,7 +53,9 @@ export async function updateSession(request: NextRequest) {
     return redirigir(destino)
   }
 
-  if (conSesion && empiezaCon(ruta, RUTAS_SOLO_ANONIMAS)) {
+  // Con ?error= el login muestra un aviso (sesión vencida, cuenta sin perfil): devolverlo al inicio
+  // lo mandaría de vuelta aquí en un bucle.
+  if (conSesion && empiezaCon(ruta, RUTAS_SOLO_ANONIMAS) && !request.nextUrl.searchParams.has("error")) {
     const destino = request.nextUrl.clone()
     destino.pathname = "/"
     destino.search = ""

@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useState } from "react"
+import { startTransition, useActionState, useState } from "react"
 import { ArrowRightIcon, LockKeyholeIcon } from "lucide-react"
 import { Campo } from "@/components/campo"
 import { MensajeFormulario } from "@/components/mensaje-formulario"
@@ -25,12 +25,22 @@ const ESTILO_PANEL: Record<Estado, string> = {
 type Props = { solicitudId: string; estadoActual: Estado; rol: Rol }
 
 export function PanelGestion({ solicitudId, estadoActual, rol }: Props) {
-  const [estado, enviar, enviando] = useActionState<EstadoFormulario, FormData>(
-    cambiarEstado.bind(null, solicitudId, estadoActual),
-    {}
-  )
-  const opciones = transicionesPara(estadoActual, rol)
   const [destino, setDestino] = useState<Estado | "">("")
+  // Cambia tras cada cambio exitoso: vuelve a montar la observación vacía.
+  const [cambios, setCambios] = useState(0)
+  // Si el cambio falla (p. ej. rechazar sin observación), el formulario queda tal cual: el destino
+  // sigue elegido y la etiqueta sigue diciendo que la observación es obligatoria. Por eso se envía
+  // con onSubmit y no con action={...}: React reinicia el formulario después de una action y el
+  // select quedaría en blanco aunque el estado conserve el destino.
+  const [estado, enviar, enviando] = useActionState<EstadoFormulario, FormData>(async (previo, formData) => {
+    const resultado = await cambiarEstado(solicitudId, estadoActual, previo, formData)
+    if (resultado.ok) {
+      setDestino("")
+      setCambios((n) => n + 1)
+    }
+    return resultado
+  }, {})
+  const opciones = transicionesPara(estadoActual, rol)
 
   if (opciones.length === 0) {
     return (
@@ -54,9 +64,10 @@ export function PanelGestion({ solicitudId, estadoActual, rol }: Props) {
 
   return (
     <form
-      action={(formData) => {
-        enviar(formData)
-        setDestino("")
+      onSubmit={(evento) => {
+        evento.preventDefault()
+        const datos = new FormData(evento.currentTarget)
+        startTransition(() => enviar(datos))
       }}
       className="grid gap-4"
       noValidate
@@ -100,12 +111,12 @@ export function PanelGestion({ solicitudId, estadoActual, rol }: Props) {
         ayuda="La verá el estudiante y se incluye en el correo de aviso."
       >
         <Textarea
+          key={cambios}
           id="observacion"
           name="observacion"
           rows={4}
           maxLength={2000}
           required={obligatoria}
-          defaultValue={estado.ok ? "" : estado.valores?.observacion}
           aria-invalid={Boolean(estado.errores?.observacion)}
           aria-describedby="observacion-mensaje"
         />
