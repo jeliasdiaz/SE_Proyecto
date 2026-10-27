@@ -15,19 +15,19 @@ Antes de hacer commit, revisar que el JSON no contenga secretos: las credenciale
 |---|---|---|---|
 | [`F1-registro.json`](F1-registro.json) | #19 | Abel | Webhook `f1-registro` (INSERT en `solicitudes`) |
 | [`F2-cambio-estado.json`](F2-cambio-estado.json) | #20 | Abel | Webhook `f2-cambio-estado` (UPDATE en `solicitudes`) |
-| `F3-recordatorio.json` | #21 | Santiago | Programado |
-| [`F4-correo-a-caso.json`](F4-correo-a-caso.json) | #22, #23 | Santiago | IMAP (por ahora solo la lectura, #22) |
+| [`F3-recordatorio.json`](F3-recordatorio.json) | #21 | Abel | Programado (8:00) o *Ejecutar ahora* |
+| [`F4-correo-a-caso.json`](F4-correo-a-caso.json) | #22, #23 | Santiago (lectura, #22) · Abel (correo a caso, #23) | IMAP |
 | [`Enviar-aviso.json`](Enviar-aviso.json) | — | Abel | Subflujo: lo llaman otros flujos |
 
 **Enviar-aviso** envía un correo y registra el envío en `avisos_enviados`, también cuando falla
 (`resultado = fallida`, con el error en `detalle`). Recibe un ítem por correo: `destinatario`,
-`asunto`, `cuerpo` (HTML), `tipo_aviso`, `solicitud_id`. Hoy lo usan F1 y F2. F3 y F4 pueden
-llamarlo con el nodo *Execute Workflow* en vez de repetir el envío y el registro; está pendiente
-acordarlo con Santiago.
+`asunto`, `cuerpo` (HTML), `tipo_aviso` y `solicitud_id`, o `solicitud_ids` cuando un correo cubre
+varias solicitudes (el resumen de F3): entonces registra una fila por cada una. Lo usan F1, F2, F3 y F4.
 
-Al importar en Azure, los flujos piden las variables `APP_URL` (enlaces de los correos) y
-`CORREO_REMITENTE`, además de `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`. Las credenciales se eligen de
-nuevo en cada nodo, con las de producción.
+Al importar en Azure, los flujos piden las variables `APP_URL` (enlaces de los correos),
+`CORREO_REMITENTE` y, para F4, `SUPABASE_URL` (sube los adjuntos a Storage), además de
+`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`. Las credenciales se eligen de nuevo en cada nodo, con las de
+producción. F4 conserva el id del flujo de lectura que ya estaba en Azure: al importarlo lo reemplaza.
 
 ## Desarrollo local
 

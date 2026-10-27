@@ -35,6 +35,7 @@ cp .env.example .env
 docker compose up -d
 scripts/credenciales.sh
 scripts/importar.sh     # importa n8n/*.json, publica los flujos y reinicia n8n (o: scripts/importar.sh F1-registro)
+scripts/webhooks.sh     # Database Webhooks (#25) del Supabase local hacia F1/F2; repetir tras cada `supabase db reset`
 ```
 
 Abre http://localhost:5678 y crea la cuenta de dueño (solo existe en tu volumen local).
@@ -51,6 +52,10 @@ hay que volver a elegirlas al importar:
 
 ## Probar
 
+Con todo corriendo (Supabase, este entorno y `scripts/webhooks.sh`), las pruebas de punta a punta de
+`web/` verifican también F1, F2, F3 y F4 con sus correos: `cd web && npm run test:e2e` (ver
+[`docs/plan-qa-demo.md`](../../docs/plan-qa-demo.md)).
+
 ```bash
 # F1 / F2 sin esperar a los Database Webhooks (#25). Usa una solicitud real del Supabase local.
 scripts/simular-webhook.sh insert f1-registro [solicitud_id]
@@ -60,6 +65,10 @@ PRUEBA=1 scripts/simular-webhook.sh insert f1-registro   # con el editor en "Lis
 # F4 / #28: dejar correos en el buzón del proyecto
 scripts/correo-prueba.sh ana.gomez@demo.test "Solicitud de supletorio" "Solicito supletorio de..." [adjunto.pdf]
 scripts/correo-prueba.sh desconocido@otro.test "Hola" "Quiero información"
+
+# F3 sin esperar a las 8:00 (como el botón "Ejecutar ahora"). Otro puerto para el broker de tareas:
+# el n8n que está corriendo ya usa el de siempre.
+docker compose exec -e N8N_RUNNERS_BROKER_PORT=5690 n8n n8n execute --id=seF3Recordator01
 ```
 
 Los usuarios de prueba del `seed.sql` (`ana.gomez@demo.test`, …) sirven como remitentes
@@ -88,7 +97,8 @@ junto con `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`:
 | Variable | Uso |
 |---|---|
 | `APP_URL` | Enlaces de los correos a `/mis-solicitudes/<id>` y `/gestion/solicitudes/<id>` |
-| `CORREO_REMITENTE` | Remitente de todos los correos (en local sale de `SMTP_REMITENTE`) |
+| `CORREO_REMITENTE` | Remitente de todos los correos (en local sale de `SMTP_REMITENTE`). F4 no le responde a esta dirección |
+| `SUPABASE_URL` | F4: URL de la API para subir el adjunto a Storage (la llave va en la credencial) |
 
 ## Notas para los flujos
 
@@ -100,9 +110,10 @@ junto con `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`:
   `recordatorio` y `remitente_desconocido`. `resultado` solo acepta `enviada`, `fallida` y
   `pendiente`.
 - Los webhooks responden 403 si falta el encabezado `WEBHOOK_HEADER` con `WEBHOOK_SECRET`.
-- Para #25 en local, los Database Webhooks de Supabase apuntan a
-  `http://n8n:5678/webhook/f1-registro` y `.../f2-cambio-estado`, con ese encabezado. El contenedor
-  de la base de datos está en la misma red.
+- Para #25 en local, `scripts/webhooks.sh` crea los Database Webhooks de Supabase hacia
+  `http://n8n:5678/webhook/f1-registro` (INSERT) y `.../f2-cambio-estado` (UPDATE), con ese
+  encabezado. El contenedor de la base de datos está en la misma red. En la nube son los mismos dos
+  webhooks, creados en Database → Webhooks con la URL pública de n8n.
 
 ## Reiniciar desde cero
 
