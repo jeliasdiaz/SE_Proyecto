@@ -90,9 +90,11 @@ Responsables según [`issues-github.md`](issues-github.md). Cada punto dice cóm
 2. ✅ **Correcciones desplegadas en Vercel** (PR #36, 27/10); `verificar-demo.sh` en verde. Falta
    actualizar el sitio del repositorio en GitHub: todavía apunta a `se-proyecto-two.vercel.app`,
    que ya no existe.
-3. **Migraciones aplicadas en la nube.** Deben estar las 10 de `supabase/migrations/`, en especial
-   las del rol asesor (`20260925*`) y `20260926000100_rendimiento.sql`: sin `conteos_bandeja()` la
-   bandeja falla. Comprobar en el SQL Editor:
+3. **Migraciones aplicadas en la nube.** Deben estar las 12 de `supabase/migrations/`, en especial
+   las del rol asesor (`20260925*`), `20260926000100_rendimiento.sql` (sin `conteos_bandeja()` la
+   bandeja falla) y las de asignación automática (`20261028*`). `20261028000200_sin_por_revisar.sql`
+   borra columnas que el F4 anterior enviaba: va siempre después de publicar el F4 nuevo (hecho el
+   29/10). Comprobar en el SQL Editor:
    `select version from supabase_migrations.schema_migrations order by 1;`
    o, con el proyecto vinculado, `npx supabase migration list --linked`.
 4. **Autenticación en la nube** (Authentication en el panel). `supabase/config.toml` solo aplica en local:
@@ -117,10 +119,16 @@ Responsables según [`issues-github.md`](issues-github.md). Cada punto dice cóm
 7. **Cuentas para la demo en producción.** Un admin, dos asesores y un estudiante cuyo buzón se pueda
    abrir en pantalla para mostrar los correos. Los estudiantes de `seed-nube.sql` (`@demo.test`)
    no reciben correos ni tienen contraseña conocida: sirven de relleno, no para el recorrido.
-8. **F3 y F4 en Azure** (issues #21, #23): publicados (punto 6). Falta la prueba de humo: un correo
-   desde la cuenta de un estudiante a `gestionsolicitudes.se@gmail.com` debe crear la solicitud en
-   menos de un minuto y llegarle la confirmación de F1. Para F3, *Execute workflow* en el editor
-   (si no, corre solo a las 8:00).
+8. ✅ **F3 y F4 en Azure** (issues #21, #23), probados en producción:
+   - F3 corrió solo a las 8:00 del 28/10 y envió los recordatorios.
+   - F4, el 29/10: un correo de un estudiante a `gestionsolicitudes.se@gmail.com` se volvió
+     solicitud en segundos, la base la asignó a un asesor y F1 avisó a los dos.
+   - Tras el cambio de buzón, F4 estuvo un día sin procesar nada y sin mostrar errores: el
+     disparador IMAP guardaba el UID del último correo del buzón anterior y descartaba los del
+     nuevo, que numera desde 1. Ahora el script lo reinicia al cambiar la credencial IMAP (ver
+     [`n8n/azure/README.md`](../n8n/azure/README.md)).
+   - Falta en producción: un cambio de estado (F2) y el registro y la recuperación de contraseña
+     con el SMTP nuevo de Supabase.
 
 ### P1: importante
 
@@ -155,7 +163,7 @@ empezar: estudiante, asesor A, asesor B, admin y el buzón del estudiante.
 | 10 | Admin | **Roles**: buscar un estudiante y hacerlo asesor | El rol admin solo se da por SQL | `recorrido-demo` (roles) |
 | 11 | Cualquiera | Seguimiento completo de la solicitud | Trazabilidad: quién, cuándo, de qué estado a cuál | — |
 
-Automatización con F3 y F4 (probados en local; en la nube, después del punto 8 de la sección 4):
+Automatización con F3 y F4 (publicados en la nube y probados en producción, punto 8 de la sección 4):
 
 | Paso | Quién | Qué se muestra | Qué decir | Prueba que lo cubre |
 |---|---|---|---|---|
