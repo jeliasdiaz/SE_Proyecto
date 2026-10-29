@@ -3,7 +3,6 @@ import type { Enums } from "@/types/database"
 export type Estado = Enums<"estado_solicitud">
 export type Tipo = Enums<"tipo_solicitud">
 export type Origen = Enums<"origen_solicitud">
-export type Revision = Enums<"estado_revision">
 export type Rol = Enums<"rol_usuario">
 
 export const ETIQUETA_ESTADO: Record<Estado, string> = {

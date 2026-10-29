@@ -18,7 +18,8 @@ export function enviarAlBuzon(remitente: string, asunto: string, cuerpo: string,
     writeFileSync(adjunto.ruta, adjunto.contenido)
     argumentos.push(adjunto.ruta)
   }
-  execFileSync("scripts/correo-prueba.sh", argumentos, { cwd: N8N_LOCAL, stdio: "pipe" })
+  // Con bash explícito: en Windows no se puede ejecutar un .sh directamente.
+  execFileSync("bash", ["scripts/correo-prueba.sh", ...argumentos], { cwd: N8N_LOCAL, stdio: "pipe" })
 }
 
 // Ejecuta un flujo como el botón "Ejecutar ahora". Otro puerto para el broker de tareas: el n8n que
@@ -50,8 +51,7 @@ export type Solicitud = {
   asunto: string
   descripcion: string
   origen: string
-  revision: string
-  motivo_revision: string | null
+  responsable_id: string | null
   adjunto_path: string | null
   estado: string
 }

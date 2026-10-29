@@ -13,6 +13,13 @@ export const USUARIOS = {
 
 export type Usuario = keyof typeof USUARIOS
 
+// La clave de USUARIOS que corresponde a un correo.
+export function usuarioDe(correo: string | null): Usuario {
+  const usuario = (Object.keys(USUARIOS) as Usuario[]).find((u) => USUARIOS[u].correo === correo)
+  if (!usuario) throw new Error(`No hay un usuario de prueba con el correo ${correo}`)
+  return usuario
+}
+
 const MAILPIT = "http://127.0.0.1:54324/api/v1"
 
 // Asuntos únicos: las pruebas no dependen de que la base esté recién reseteada.

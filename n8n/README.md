@@ -13,7 +13,7 @@ Antes de hacer commit, revisar que el JSON no contenga secretos: las credenciale
 
 | Archivo | Issue | Dueño | Disparador |
 |---|---|---|---|
-| [`F1-registro.json`](F1-registro.json) | #19 | Abel | Webhook `f1-registro` (INSERT en `solicitudes`) |
+| [`F1-registro.json`](F1-registro.json) | #19 | Abel | Webhook `f1-registro` (INSERT en `solicitudes`): avisa al estudiante y al asesor asignado |
 | [`F2-cambio-estado.json`](F2-cambio-estado.json) | #20 | Abel | Webhook `f2-cambio-estado` (UPDATE en `solicitudes`) |
 | [`F3-recordatorio.json`](F3-recordatorio.json) | #21 | Abel | Programado (8:00) o *Ejecutar ahora* |
 | [`F4-correo-a-caso.json`](F4-correo-a-caso.json) | #22, #23 | Santiago (lectura, #22) · Abel (correo a caso, #23) | IMAP |

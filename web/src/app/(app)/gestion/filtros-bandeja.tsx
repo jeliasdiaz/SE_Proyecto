@@ -20,12 +20,11 @@ type Props = {
   tipo?: Tipo
   origen?: Origen
   estado?: Estado
-  porRevisar: boolean
   responsable?: string
   hayFiltros: boolean
 }
 
-export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, responsable, hayFiltros }: Props) {
+export function FiltrosBandeja({ q, tipo, origen, estado, responsable, hayFiltros }: Props) {
   const router = useRouter()
   const [pendiente, iniciar] = useTransition()
   const formulario = useRef<HTMLFormElement>(null)
@@ -64,7 +63,6 @@ export function FiltrosBandeja({ q, tipo, origen, estado, porRevisar, responsabl
       className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center"
     >
       {estado && <input type="hidden" name="estado" value={estado} />}
-      {porRevisar && <input type="hidden" name="revision" value="por_revisar" />}
       {responsable && <input type="hidden" name="responsable" value={responsable} />}
       <div className="relative col-span-2 sm:min-w-56 sm:flex-1">
         <button

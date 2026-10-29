@@ -18,8 +18,8 @@ begin
   end if;
 
   insert into public.solicitudes (
-    estudiante_id, tipo, asunto, descripcion, estado, observaciones, origen, revision,
-    creada, actualizada
+    estudiante_id, tipo, asunto, descripcion, estado, observaciones, origen, creada,
+    actualizada
   )
   select
     v_estudiante,
@@ -29,7 +29,6 @@ begin
     datos.estado::public.estado_solicitud,
     datos.observaciones,
     'web'::public.origen_solicitud,
-    'ok'::public.estado_revision,
     now() - datos.dias_anteriores * interval '1 day',
     now() - datos.dias_anteriores * interval '1 day'
   from (
