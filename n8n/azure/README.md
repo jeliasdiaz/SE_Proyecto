@@ -16,13 +16,19 @@ El script:
   apunta las llamadas a Enviar-aviso a su id real;
 - escribe en los nodos `SUPABASE_URL` y `CORREO_REMITENTE` de `.env`, porque las variables de la VM
   no se pueden cambiar sin acceso a Azure;
+- si cambia la credencial IMAP de F4, borra el último correo que leyó (ver abajo);
 - publica cada flujo.
+
+Despliega los JSON de tu carpeta, no los de GitHub. Por eso `aplicar` se niega si tu rama no
+incluye la última `feat/frontend` o si los JSON tienen cambios sin commit: desde una rama atrasada
+desharía lo que otro ya publicó. `plan` muestra el mismo aviso sin detenerse.
 
 ## Uso
 
-Requiere Python 3, sin dependencias.
+Requiere Python 3, sin dependencias. Córrelo desde `feat/frontend` actualizada.
 
 ```bash
+git switch feat/frontend && git pull
 cp n8n/azure/.env.example n8n/azure/.env    # y pon N8N_API_KEY
 python3 n8n/azure/desplegar.py inventario   # qué hay en Azure (solo lee, y respalda)
 python3 n8n/azure/desplegar.py plan         # qué haría (solo lee)
@@ -39,7 +45,19 @@ Si hay dos credenciales del mismo tipo y ningún flujo usa todavía la nueva, `p
 pide elegirla: `--credencial imap=<id>` (los ids salen en `inventario`). Borra la llave de API en
 n8n cuando termines.
 
-## Producción (28/10/2026)
+## Si cambian el buzón de F4
+
+El disparador IMAP guarda el UID del último correo que procesó y descarta los que tengan uno menor
+o igual. Cada buzón numera desde 1, así que con otro buzón **F4 no procesa nada y no muestra
+errores**. Pasó el 28/10: el UID venía del buzón anterior (23180) y el nuevo iba en 8.
+
+- Con una credencial IMAP nueva, el script borra ese dato solo (`plan` lo avisa).
+- Si cambian el buzón editando la misma credencial, agrega `--reiniciar-imap`.
+
+Tras el reinicio, F4 solo toma los correos sin leer de la fecha en que se publica: los anteriores
+hay que reenviarlos.
+
+## Producción (29/10/2026)
 
 | Flujo | Id en Azure |
 |---|---|

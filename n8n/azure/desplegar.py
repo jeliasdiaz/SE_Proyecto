@@ -8,6 +8,8 @@
 
 Actualiza en su lugar los flujos que ya existen (mismo id y misma ruta de webhook), cambia las
 credenciales locales por las de producción y apunta las llamadas a Enviar-aviso a su id en Azure.
+Despliega los JSON de la carpeta local: `aplicar` se niega si la rama no incluye la última
+feat/frontend o si los JSON tienen cambios sin commit (--forzar lo salta).
 La configuración (llave de API incluida) se lee de n8n/azure/.env o de variables de entorno.
 """
 import argparse
@@ -17,6 +19,7 @@ import json
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -24,6 +27,7 @@ import urllib.request
 AQUI = pathlib.Path(__file__).resolve().parent
 FLUJOS = AQUI.parent
 RESPALDOS = AQUI / "respaldos"
+RAMA_PRODUCCION = "feat/frontend"
 # Enviar-aviso primero: los demás necesitan su id.
 ORDEN = ["Enviar-aviso", "F1-registro", "F2-cambio-estado", "F4-correo-a-caso", "F3-recordatorio"]
 ID_LOCAL_ENVIAR = "seEnviarAviso001"
@@ -242,6 +246,41 @@ def flujos_a_desplegar(args):
     return [n for n in ORDEN if not args.solo or n in args.solo]
 
 
+def revisar_rama():
+    """Devuelve (bloqueos, avisos). Desde una rama atrasada se desplegarían flujos viejos y se
+    desharían cambios ya publicados."""
+    def git(*partes):
+        return subprocess.run(["git", "-C", str(FLUJOS), *partes], capture_output=True, text=True)
+
+    bloqueos, avisos = [], []
+    if git("fetch", "-q", "origin", RAMA_PRODUCCION).returncode != 0:
+        avisos.append(f"no se pudo traer origin/{RAMA_PRODUCCION}: se compara con la copia local")
+    if git("merge-base", "--is-ancestor", f"origin/{RAMA_PRODUCCION}", "HEAD").returncode != 0:
+        bloqueos.append(f"la rama actual no incluye la última origin/{RAMA_PRODUCCION}: desplegaría flujos viejos")
+    cambios = git("status", "--porcelain", "--", *[f"{nombre}.json" for nombre in ORDEN]).stdout.rstrip()
+    if cambios:
+        bloqueos.append(f"hay cambios sin commit en los JSON:\n{cambios}")
+    return bloqueos, avisos
+
+
+def credencial_imap(nodos):
+    return next((c["id"] for n in nodos for t, c in (n.get("credentials") or {}).items() if t == "imap"), None)
+
+
+def reinicio_imap(objetivo, mapa, pedido):
+    """Motivo para borrar el último UID leído de F4, o None. El disparador IMAP descarta los correos
+    con UID menor o igual al guardado, y cada buzón numera desde 1: con otro buzón no leería nada."""
+    w = objetivo["F4-correo-a-caso"]
+    if not w:
+        return None
+    if pedido:
+        return "a pedido (--reiniciar-imap)"
+    publicado = (w.get("activeVersion") or {}).get("nodes") or w["nodes"]
+    if credencial_imap(publicado) != mapa.get("imap", {}).get("id"):
+        return "cambia la credencial IMAP"
+    return None
+
+
 def cmd_inventario(args):
     flujos, credenciales, carpeta = inventario()
     print(f"Respaldo: {carpeta}\n\nFlujos en Azure ({len(flujos)}):")
@@ -273,11 +312,21 @@ def cmd_plan(args, aplicar=False):
               + (", queda sin publicar" if nombre in args.sin_publicar else ""))
     print(f"\nRemitente: {remitente or 'se deja $env.CORREO_REMITENTE (variable de la VM)'}")
     print(f"SUPABASE_URL en «Subir adjunto»: {supabase_url or 'se deja $env.SUPABASE_URL (debe existir en la VM)'}")
+    reinicio = reinicio_imap(objetivo, mapa, args.reiniciar_imap) if "F4-correo-a-caso" in flujos_a_desplegar(args) else None
+    if reinicio:
+        print(f"F4: se borra el último correo leído del buzón ({reinicio})")
+    bloqueos, avisos = revisar_rama()
+    for aviso in avisos:
+        print(f"\nAviso: {aviso}")
+    for bloqueo in bloqueos:
+        print(f"\nRAMA: {bloqueo}")
     if problemas:
         sys.exit("\nNo se aplica nada hasta resolver las credenciales.")
     if not aplicar:
         print("\n(Solo plan: no se cambió nada.)")
         return
+    if bloqueos and not args.forzar:
+        sys.exit(f"\nNo se aplica nada: actualiza la rama (git pull origin {RAMA_PRODUCCION}) y haz commit, o usa --forzar.")
 
     print(f"\nRespaldo antes de cambiar: {carpeta}\n")
     enviar_id = objetivo["Enviar-aviso"]["id"] if objetivo["Enviar-aviso"] else None
@@ -285,7 +334,10 @@ def cmd_plan(args, aplicar=False):
     for nombre in flujos_a_desplegar(args):
         if nombre != "Enviar-aviso" and not enviar_id:
             sys.exit("Enviar-aviso no existe en Azure: despliégalo primero.")
-        d = guardar(objetivo[nombre], construir(nombre, enviar_id, mapa, supabase_url, remitente))
+        cuerpo = construir(nombre, enviar_id, mapa, supabase_url, remitente)
+        if nombre == "F4-correo-a-caso" and reinicio:
+            cuerpo["staticData"] = {}  # n8n lo vuelve a cargar al republicar
+        d = guardar(objetivo[nombre], cuerpo)
         guardados[nombre] = d["id"]
         if nombre == "Enviar-aviso":
             enviar_id = d["id"]
@@ -331,6 +383,10 @@ def main():
                        help="fuerza la credencial de un tipo (supabaseApi, smtp, httpHeaderAuth, imap)")
         s.add_argument("--supabase-url", help="reemplaza SUPABASE_URL de .env")
         s.add_argument("--correo-remitente", help="reemplaza CORREO_REMITENTE de .env")
+        s.add_argument("--reiniciar-imap", action="store_true",
+                       help="borra el último correo leído de F4 (si cambia el buzón sin cambiar de credencial)")
+        s.add_argument("--forzar", action="store_true",
+                       help="aplica aunque la rama esté atrasada o los JSON tengan cambios sin commit")
     r = sub.add_parser("restaurar")
     r.add_argument("carpeta", help="una carpeta de n8n/azure/respaldos/")
     args = p.parse_args()
