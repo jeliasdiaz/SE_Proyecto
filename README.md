@@ -20,11 +20,11 @@ Cada carpeta tiene su propio README con más detalle.
 
 | Rol | Entra a | Puede |
 |---|---|---|
-| Estudiante | `/mis-solicitudes` | Registrar solicitudes, seguir las suyas y retirar una pendiente. |
-| Asesor | `/gestion` | Ver todas las solicitudes, **tomar** una sin responsable y gestionar solo las suyas (estado, observación, clasificación). |
+| Estudiante | `/mis-solicitudes` | Registrar solicitudes, seguir las suyas y retirar una pendiente. Cada solicitud nueva queda a cargo del asesor con menos solicitudes abiertas. |
+| Asesor | `/gestion` | Ver todas las solicitudes, gestionar las que tiene asignadas (estado, observación, tipo) y **tomar** una sin responsable (las que el admin libera o las que llegan cuando no hay asesores). |
 | Administrador | `/admin` | Todo lo del asesor sobre cualquier caso, más: reasignar o liberar casos, reabrir uno finalizado o rechazado, ver la carga de cada asesor y las métricas, y dar o quitar el rol de asesor (`/admin/usuarios`). |
 
-Las reglas viven en la base de datos (RLS y el trigger `validar_cambio_solicitud`), no en la interfaz: dos asesores que toman el mismo caso a la vez compiten por el bloqueo de la fila y solo uno lo obtiene. El rol de administrador solo se asigna por SQL. `supabase/snippets/prueba-roles.sql` comprueba estas reglas contra la base local.
+Las reglas viven en la base de datos (RLS y los triggers `asignar_responsable` y `validar_cambio_solicitud`), no en la interfaz: la asignación automática vale igual para la web y para los correos que convierte F4; dos asesores que toman el mismo caso a la vez compiten por el bloqueo de la fila y solo uno lo obtiene. El rol de administrador solo se asigna por SQL. `supabase/snippets/prueba-roles.sql` comprueba estas reglas contra la base local.
 
 ## Stack
 

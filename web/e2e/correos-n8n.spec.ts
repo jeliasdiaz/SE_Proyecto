@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
-import { API, cabecerasSecretas } from "./supabase-local"
-import { USUARIOS, cambiarEstado, crearSolicitud, enlaceDe, esperarCorreo, sesion, unico } from "./utilidades"
+import { API, cabecerasSecretas, responsableDe } from "./supabase-local"
+import { USUARIOS, cambiarEstado, crearSolicitud, enlaceDe, esperarCorreo, sesion, unico, usuarioDe, type Usuario } from "./utilidades"
 
 // Cadena completa de avisos: web → Supabase (Database Webhook) → n8n (F1/F2 + Enviar-aviso) → correo.
 // Requiere el entorno de n8n/local corriendo, con los flujos importados y scripts/webhooks.sh aplicado.
@@ -22,9 +22,10 @@ test.describe.serial("Avisos por correo (n8n)", () => {
 
   const asunto = unico("Homologación de Cálculo Diferencial")
   let id = ""
+  let asesor: Usuario
   let desde: Date
 
-  test("F1: registrar una solicitud avisa al estudiante y a la coordinación", async ({ browser }) => {
+  test("F1: registrar una solicitud avisa al estudiante y al asesor asignado", async ({ browser }) => {
     desde = new Date(Date.now() - 1000)
     const ana = await sesion(browser, "ana")
     id = await crearSolicitud(ana, {
@@ -37,25 +38,28 @@ test.describe.serial("Avisos por correo (n8n)", () => {
     expect(alEstudiante).toContain(asunto)
     expect(enlaceDe(alEstudiante, `/mis-solicitudes/${id}`)).toMatch(new RegExp(`^https?://[^/]+/mis-solicitudes/${id}$`))
 
-    for (const persona of [USUARIOS.admin, USUARIOS.laura, USUARIOS.mateo]) {
-      const aviso = await esperarCorreo(persona.correo, /Nueva solicitud: Homologación/, desde)
-      expect(aviso).toContain(asunto)
-      expect(enlaceDe(aviso, `/gestion/solicitudes/${id}`)).toContain(`/gestion/solicitudes/${id}`)
-    }
+    expect(alEstudiante).toContain("ya tiene un asesor de la coordinación a cargo")
 
-    await expect.poll(async () => (await avisos(id)).length).toBe(4)
+    // Solo al asesor que la recibió, no a todo el personal.
+    asesor = usuarioDe(await responsableDe(id))
+    const aviso = await esperarCorreo(USUARIOS[asesor].correo, /Se te asignó una solicitud: Homologación/, desde)
+    expect(aviso).toContain(asunto)
+    expect(aviso).toContain("quedó a tu cargo")
+    expect(enlaceDe(aviso, `/gestion/solicitudes/${id}`)).toContain(`/gestion/solicitudes/${id}`)
+
+    await expect.poll(async () => (await avisos(id)).length).toBe(2)
     expect((await avisos(id)).every((a) => a.resultado === "enviada")).toBe(true)
   })
 
-  test("F2: tomar el caso no avisa; cambiar el estado sí, con la observación", async ({ browser }) => {
-    const laura = await sesion(browser, "laura")
-    await laura.goto(`/gestion/solicitudes/${id}`)
-    await laura.getByRole("button", { name: "Tomar" }).click()
-    await expect(laura.getByText("La solicitud quedó a tu cargo.")).toBeVisible()
+  test("F2: corregir el tipo no avisa; cambiar el estado sí, con la observación", async ({ browser }) => {
+    const pagina = await sesion(browser, asesor)
+    await pagina.goto(`/gestion/solicitudes/${id}`)
+    await pagina.getByRole("button", { name: "Guardar tipo" }).click()
+    await expect(pagina.getByText("Clasificación guardada.")).toBeVisible()
 
     desde = new Date(Date.now() - 1000)
-    await cambiarEstado(laura, "En proceso", "Revisamos el contenido programático <con> el comité.")
-    await expect(laura.getByText("Estado actualizado.")).toBeVisible()
+    await cambiarEstado(pagina, "En proceso", "Revisamos el contenido programático <con> el comité.")
+    await expect(pagina.getByText("Estado actualizado.")).toBeVisible()
 
     const html = await esperarCorreo(USUARIOS.ana.correo, /Tu solicitud está en proceso/, desde)
     expect(html).toContain("La coordinación empezó a revisar tu solicitud.")
@@ -63,15 +67,15 @@ test.describe.serial("Avisos por correo (n8n)", () => {
     expect(html).toContain("Revisamos el contenido programático &lt;con&gt; el comité.")
     expect(html).toContain("Pendiente → <strong>En proceso</strong>")
 
-    // Solo un aviso de cambio de estado: tomar el caso (UPDATE sin cambio de estado) no avisa.
+    // Solo un aviso de cambio de estado: guardar el tipo (UPDATE sin cambio de estado) no avisa.
     await expect.poll(async () => (await avisos(id)).filter((a) => a.tipo_aviso === "cambio_estado").length).toBe(1)
   })
 
   test("F2: finalizar y reabrir llevan su propio mensaje", async ({ browser }) => {
-    const laura = await sesion(browser, "laura")
-    await laura.goto(`/gestion/solicitudes/${id}`)
+    const pagina = await sesion(browser, asesor)
+    await pagina.goto(`/gestion/solicitudes/${id}`)
     desde = new Date(Date.now() - 1000)
-    await cambiarEstado(laura, "Finalizada", "Homologación aprobada.")
+    await cambiarEstado(pagina, "Finalizada", "Homologación aprobada.")
     const final = await esperarCorreo(USUARIOS.ana.correo, /Tu solicitud está finalizada/, desde)
     expect(final).toContain("Tu solicitud fue resuelta y el caso quedó cerrado.")
 

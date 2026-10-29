@@ -44,8 +44,6 @@ declare
   v_tipo public.tipo_solicitud;
   v_estado public.estado_solicitud;
   v_origen public.origen_solicitud;
-  v_revision public.estado_revision;
-  v_motivo text;
   v_asuntos text[];
   v_asunto text;
   v_factor integer;
@@ -125,13 +123,9 @@ begin
       else 'rechazada'
     end;
     v_origen := case when i % 5 = 0 then 'correo' else 'web' end;
-    v_revision := 'ok';
-    v_motivo := null;
-
+    -- Un correo en el que F4 no reconoció el trámite.
     if v_origen = 'correo' and v_estado = 'pendiente' and i % 20 = 0 then
       v_tipo := 'otro';
-      v_revision := 'por_revisar';
-      v_motivo := 'No se pudo identificar el tipo de trámite en el correo.';
     end if;
 
     v_asuntos := case v_tipo
@@ -201,8 +195,8 @@ begin
     end if;
 
     insert into public.solicitudes (
-      id, estudiante_id, tipo, asunto, descripcion, estado, observaciones, origen, revision,
-      motivo_revision, responsable_id, creada, actualizada, cerrada
+      id, estudiante_id, tipo, asunto, descripcion, estado, observaciones, origen, responsable_id,
+      creada, actualizada, cerrada
     ) values (
       v_id,
       v_estudiante,
@@ -216,8 +210,6 @@ begin
       v_estado,
       v_nota,
       v_origen,
-      v_revision,
-      v_motivo,
       case when v_estado <> 'pendiente' then v_responsable end,
       v_creada,
       v_actualizada,

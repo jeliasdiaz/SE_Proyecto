@@ -10,9 +10,9 @@ import { ETIQUETA_TIPO, TIPOS, type Tipo } from "@/lib/dominio"
 import type { EstadoFormulario } from "@/lib/validacion"
 import { clasificarSolicitud } from "./actions"
 
-type Props = { solicitudId: string; tipoActual: Tipo; porRevisar: boolean }
+type Props = { solicitudId: string; tipoActual: Tipo }
 
-export function PanelClasificacion({ solicitudId, tipoActual, porRevisar }: Props) {
+export function PanelClasificacion({ solicitudId, tipoActual }: Props) {
   const [estado, enviar, enviando] = useActionState<EstadoFormulario, FormData>(
     clasificarSolicitud.bind(null, solicitudId),
     {}
@@ -36,9 +36,9 @@ export function PanelClasificacion({ solicitudId, tipoActual, porRevisar }: Prop
           ))}
         </NativeSelect>
       </Campo>
-      <Button type="submit" variant={porRevisar ? "default" : "outline"} disabled={enviando}>
+      <Button type="submit" variant="outline" disabled={enviando}>
         {enviando && <Spinner data-icon="inline-start" />}
-        {enviando ? "Guardando…" : porRevisar ? "Confirmar tipo y marcar revisada" : "Guardar tipo"}
+        {enviando ? "Guardando…" : "Guardar tipo"}
       </Button>
     </form>
   )

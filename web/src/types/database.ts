@@ -175,11 +175,9 @@ export type Database = {
           estado: Database["public"]["Enums"]["estado_solicitud"]
           estudiante_id: string
           id: string
-          motivo_revision: string | null
           observaciones: string | null
           origen: Database["public"]["Enums"]["origen_solicitud"]
           responsable_id: string | null
-          revision: Database["public"]["Enums"]["estado_revision"]
           tipo: Database["public"]["Enums"]["tipo_solicitud"]
         }
         Insert: {
@@ -192,11 +190,9 @@ export type Database = {
           estado?: Database["public"]["Enums"]["estado_solicitud"]
           estudiante_id?: string
           id?: string
-          motivo_revision?: string | null
           observaciones?: string | null
           origen?: Database["public"]["Enums"]["origen_solicitud"]
           responsable_id?: string | null
-          revision?: Database["public"]["Enums"]["estado_revision"]
           tipo: Database["public"]["Enums"]["tipo_solicitud"]
         }
         Update: {
@@ -209,11 +205,9 @@ export type Database = {
           estado?: Database["public"]["Enums"]["estado_solicitud"]
           estudiante_id?: string
           id?: string
-          motivo_revision?: string | null
           observaciones?: string | null
           origen?: Database["public"]["Enums"]["origen_solicitud"]
           responsable_id?: string | null
-          revision?: Database["public"]["Enums"]["estado_revision"]
           tipo?: Database["public"]["Enums"]["tipo_solicitud"]
         }
         Relationships: [
@@ -321,7 +315,6 @@ export type Database = {
         Args: {
           p_estado?: Database["public"]["Enums"]["estado_solicitud"]
           p_origen?: Database["public"]["Enums"]["origen_solicitud"]
-          p_por_revisar?: boolean
           p_q?: string
           p_responsable?: string
           p_solo_libres?: boolean
@@ -333,7 +326,6 @@ export type Database = {
           libres: number
           mias: number
           pendiente: number
-          por_revisar: number
           rechazada: number
           retirada: number
         }[]
@@ -344,7 +336,6 @@ export type Database = {
       puede_ser_responsable: { Args: { p_usuario: string }; Returns: boolean }
     }
     Enums: {
-      estado_revision: "ok" | "por_revisar"
       estado_solicitud: "pendiente" | "en_proceso" | "finalizada" | "rechazada" | "retirada"
       origen_solicitud: "web" | "correo"
       rol_usuario: "estudiante" | "asesor" | "admin"
@@ -485,7 +476,6 @@ export const Constants = {
   },
   public: {
     Enums: {
-      estado_revision: ["ok", "por_revisar"],
       estado_solicitud: ["pendiente", "en_proceso", "finalizada", "rechazada", "retirada"],
       origen_solicitud: ["web", "correo"],
       rol_usuario: ["estudiante", "asesor", "admin"],

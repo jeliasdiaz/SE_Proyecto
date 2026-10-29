@@ -142,7 +142,7 @@ export async function clasificarSolicitud(
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("solicitudes")
-    .update({ tipo: datos.data.tipo, revision: "ok", motivo_revision: null })
+    .update({ tipo: datos.data.tipo })
     .eq("id", id.data)
     .select("id")
   if (error) return { mensaje: mensajeDeError(error), valores }

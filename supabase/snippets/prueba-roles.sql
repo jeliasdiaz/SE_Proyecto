@@ -202,6 +202,38 @@ select pg_temp.vale('30 la solicitud nueva queda pendiente, por web y a su nombr
   'pendiente/web/true');
 select pg_temp.vale('30b la creación queda en el historial',
   format($q$select count(*) from public.historial_estados where solicitud_id = %L and estado_anterior is null$q$, :'nueva'), '1');
+
+-- Asignación automática: se comprueba como superusuario, porque el estudiante no ve la carga ajena.
+reset role;
+select pg_temp.vale('30c la solicitud nueva queda a cargo del asesor con menos solicitudes abiertas',
+  format($q$
+    with carga as (
+      select p.id, count(s.id) filter (where s.estado in ('pendiente', 'en_proceso')) as abiertas
+      from public.perfiles p left join public.solicitudes s on s.responsable_id = p.id
+      where p.rol = 'asesor'
+      group by p.id
+    ),
+    asignado as (
+      select c.* from carga c join public.solicitudes s on s.responsable_id = c.id where s.id = %L
+    )
+    -- Contando la nueva, el asignado tiene a lo sumo una más que cualquier otro asesor.
+    select (count(*) = 1 and bool_and(not exists (
+      select 1 from carga c where c.id <> a.id and c.abiertas < a.abiertas - 1
+    )))::text
+    from asignado a
+  $q$, :'nueva'), 'true');
+-- Sin asesores, la solicitud queda sin asignar y cualquiera del personal la toma desde la bandeja.
+update public.perfiles set rol = 'estudiante' where rol = 'asesor';
+select pg_temp.como('bruno.diaz@demo.test');
+insert into public.solicitudes (tipo, asunto, descripcion)
+values ('supletorio', 'Prueba sin asesores', 'Solicito supletorio del parcial de prueba.')
+returning id as sin_asesor \gset
+reset role;
+select pg_temp.vale('30d sin asesores queda sin asignar',
+  format($q$select coalesce(responsable_id::text, 'sin asignar') from public.solicitudes where id = %L$q$, :'sin_asesor'),
+  'sin asignar');
+update public.perfiles set rol = 'asesor' where correo in ('laura.ospina@demo.test', 'mateo.restrepo@demo.test', 'ana.gomez@demo.test');
+select pg_temp.como('bruno.diaz@demo.test');
 select pg_temp.falla('31 el estudiante no fija el estado al registrar',
   $q$insert into public.solicitudes (tipo, asunto, descripcion, estado) values ('otro', 'Prueba', 'Prueba de permisos', 'finalizada')$q$,
   'permission denied');

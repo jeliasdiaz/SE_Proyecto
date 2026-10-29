@@ -1,10 +1,9 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { Suspense, ViewTransition } from "react"
-import { ClockIcon, InboxIcon, ScanSearchIcon, UserCheckIcon, UserIcon, UserRoundXIcon, XIcon } from "lucide-react"
+import { ClockIcon, InboxIcon, UserCheckIcon, UserIcon, UserRoundXIcon, XIcon } from "lucide-react"
 import { BotonActualizar } from "@/components/boton-actualizar"
 import { EstadoBadge } from "@/components/estado-badge"
-import { RevisionBadge } from "@/components/revision-badge"
 import { TransicionPagina } from "@/components/transicion-pagina"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -55,7 +54,6 @@ function leerFiltros(parametros: Parametros) {
     estado: esEstado(estado) ? estado : undefined,
     tipo: esTipo(tipo) ? tipo : undefined,
     origen: esOrigen(origen) ? origen : undefined,
-    porRevisar: texto(parametros.revision) === "por_revisar",
     // "mias", "libres" o el id de una persona (el admin llega así desde el panel de asesores).
     responsable:
       responsable === "mias" || responsable === "libres" || UUID.test(responsable) ? responsable : undefined,
@@ -76,7 +74,6 @@ function enlaceConFiltros(filtros: Filtros, cambios: Partial<Filtros>): string {
   if (f.estado) parametros.set("estado", f.estado)
   if (f.tipo) parametros.set("tipo", f.tipo)
   if (f.origen) parametros.set("origen", f.origen)
-  if (f.porRevisar) parametros.set("revision", "por_revisar")
   if (f.responsable) parametros.set("responsable", f.responsable)
   if (f.q) parametros.set("q", f.q)
   if (f.pagina > 1) parametros.set("pagina", String(f.pagina))
@@ -86,7 +83,7 @@ function enlaceConFiltros(filtros: Filtros, cambios: Partial<Filtros>): string {
 
 // Lo mínimo que se necesita de una consulta de PostgREST para filtrarla.
 type Filtrable<T> = {
-  eq(columna: "estado" | "tipo" | "origen" | "revision" | "responsable_id", valor: string): T
+  eq(columna: "estado" | "tipo" | "origen" | "responsable_id", valor: string): T
   is(columna: "responsable_id", valor: null): T
   in(columna: "estado", valores: readonly Estado[]): T
   or(filtros: string): T
@@ -106,7 +103,6 @@ function aplicarFiltros<T extends Filtrable<T>>(consulta: T, filtros: Filtros, y
   if (filtros.responsable) c = filtrarResponsable(c, filtros.responsable, yo)
   if (filtros.tipo) c = c.eq("tipo", filtros.tipo)
   if (filtros.origen) c = c.eq("origen", filtros.origen)
-  if (filtros.porRevisar) c = c.eq("revision", "por_revisar")
   if (filtros.q) c = c.or(`asunto.ilike.%${filtros.q}%,descripcion.ilike.%${filtros.q}%`)
   return c
 }
@@ -125,7 +121,6 @@ export default async function BandejaPage({ searchParams }: PageProps<"/gestion"
         p_estado: filtros.estado,
         p_tipo: filtros.tipo,
         p_origen: filtros.origen,
-        p_por_revisar: filtros.porRevisar,
         p_responsable: filtros.responsable === "mias" ? yo : otraPersona,
         p_solo_libres: filtros.responsable === "libres",
         p_q: filtros.q || undefined,
@@ -147,10 +142,9 @@ export default async function BandejaPage({ searchParams }: PageProps<"/gestion"
   }
   const todas = ESTADOS.reduce((suma, e) => suma + conteos[e], 0)
   const total = filtros.estado ? conteos[filtros.estado] : todas
-  const porRevisar = resumen.data.por_revisar
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA))
   const hayFiltros = Boolean(
-    filtros.estado || filtros.tipo || filtros.origen || filtros.porRevisar || filtros.responsable || filtros.q
+    filtros.estado || filtros.tipo || filtros.origen || filtros.responsable || filtros.q
   )
   const alternarResponsable = (valor: string) =>
     enlaceConFiltros(filtros, { responsable: filtros.responsable === valor ? undefined : valor, pagina: 1 })
@@ -212,16 +206,6 @@ export default async function BandejaPage({ searchParams }: PageProps<"/gestion"
                   etiqueta={persona.data?.nombre ?? "Otra persona"}
                 />
               )}
-              {(porRevisar > 0 || filtros.porRevisar) && (
-                <Chip
-                  href={enlaceConFiltros(filtros, { porRevisar: !filtros.porRevisar, pagina: 1 })}
-                  activo={filtros.porRevisar}
-                  icono={<ScanSearchIcon className="size-3.5" aria-hidden />}
-                  etiqueta="Por revisar"
-                  conteo={porRevisar}
-                  tono="violeta"
-                />
-              )}
             </div>
           </div>
           <FiltrosBandeja
@@ -229,7 +213,6 @@ export default async function BandejaPage({ searchParams }: PageProps<"/gestion"
             tipo={filtros.tipo}
             origen={filtros.origen}
             estado={filtros.estado}
-            porRevisar={filtros.porRevisar}
             responsable={filtros.responsable}
             hayFiltros={hayFiltros}
           />
@@ -280,7 +263,7 @@ async function TablaSolicitudes({ filtros, yo, hayFiltros }: { filtros: Filtros;
     supabase
       .from("solicitudes")
       .select(
-        "id, asunto, descripcion, tipo, estado, origen, revision, motivo_revision, creada, actualizada, estudiante_id, responsable_id, estudiante:perfiles!solicitudes_estudiante_id_fkey(nombre), responsable:perfiles!solicitudes_responsable_id_fkey(nombre)"
+        "id, asunto, descripcion, tipo, estado, origen, creada, actualizada, estudiante_id, responsable_id, estudiante:perfiles!solicitudes_estudiante_id_fkey(nombre), responsable:perfiles!solicitudes_responsable_id_fkey(nombre)"
       ),
     filtros,
     yo
@@ -351,10 +334,6 @@ async function TablaSolicitudes({ filtros, yo, hayFiltros }: { filtros: Filtros;
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                   <span>{s.estudiante?.nombre}</span>
                   {s.origen === "correo" && <Badge variant="secondary">Correo</Badge>}
-                  {s.revision === "por_revisar" && (
-                    // Por encima del enlace estirado para que el motivo se vea al pasar el cursor.
-                    <RevisionBadge motivo={s.motivo_revision} className="relative z-10" />
-                  )}
                 </div>
               </TableCell>
               <TableCell className="block min-w-0 p-0 text-xs text-muted-foreground md:table-cell md:p-2 md:text-sm md:text-foreground">
@@ -398,10 +377,9 @@ type PropsChip = {
   icono: React.ReactNode
   etiqueta: string
   conteo?: number
-  tono?: "neutro" | "violeta"
 }
 
-function Chip({ href, activo, icono, etiqueta, conteo, tono = "neutro" }: PropsChip) {
+function Chip({ href, activo, icono, etiqueta, conteo }: PropsChip) {
   return (
     <Link
       href={href}
@@ -409,13 +387,9 @@ function Chip({ href, activo, icono, etiqueta, conteo, tono = "neutro" }: PropsC
       aria-current={activo ? "true" : undefined}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-        tono === "violeta"
-          ? activo
-            ? "border-violet-300 bg-violet-100 text-violet-900 hover:bg-violet-200"
-            : "border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100"
-          : activo
-            ? "border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200"
-            : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+        activo
+          ? "border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-200"
+          : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
     >
       {icono}

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { API, PUBLICA } from "./supabase-local"
+import { API, PUBLICA, liberar } from "./supabase-local"
 import { USUARIOS, crearSolicitud, sesion, unico } from "./utilidades"
 
 // Token de un usuario, como lo tendría su navegador.
@@ -27,6 +27,8 @@ async function tomar(acceso: string, solicitudId: string, usuarioId: string) {
   return (await respuesta.json()) as unknown[]
 }
 
+// Las solicitudes nuevas ya llegan asignadas; "Tomar" aplica a las que el admin libera o a las que
+// entran cuando no hay asesores.
 function sub(jwt: string): string {
   return JSON.parse(Buffer.from(jwt.split(".")[1], "base64url").toString()).sub
 }
@@ -38,6 +40,7 @@ test("dos asesores toman el mismo caso a la vez: solo uno lo obtiene", async ({ 
     asunto: unico("Supletorio de Álgebra Lineal"),
     descripcion: "Solicito supletorio del examen final de Álgebra Lineal por calamidad doméstica.",
   })
+  await liberar(id)
 
   const [laura, mateo] = await Promise.all([token(USUARIOS.laura.correo), token(USUARIOS.mateo.correo)])
   // Varias rondas en paralelo para que de verdad compitan por el bloqueo de la fila.
@@ -58,6 +61,7 @@ test("la bandeja se actualiza sola cuando otro asesor toma un caso", async ({ br
     asunto,
     descripcion: "Solicito excepción de prerrequisito para inscribir Sistemas Empresariales este semestre.",
   })
+  await liberar(id)
 
   const laura = await sesion(browser, "laura")
   await laura.goto(`/gestion?q=${encodeURIComponent(asunto)}`)

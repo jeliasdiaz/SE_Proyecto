@@ -20,7 +20,9 @@ test.describe("F4: correo a caso", () => {
     )
 
     const solicitud = await esperarSolicitud(asunto)
-    expect(solicitud).toMatchObject({ tipo: "supletorio", origen: "correo", revision: "ok", estado: "pendiente" })
+    expect(solicitud).toMatchObject({ tipo: "supletorio", origen: "correo", estado: "pendiente" })
+    // Como las de la web, queda a cargo de un asesor.
+    expect(solicitud.responsable_id).not.toBeNull()
     expect(solicitud.adjunto_path).toMatch(new RegExp(`/${solicitud.id}/incapacidad-medica\\.pdf$`))
     expect(solicitud.descripcion).toContain("por una cita médica")
 
@@ -37,24 +39,21 @@ test.describe("F4: correo a caso", () => {
     expect((await descarga).suggestedFilename()).toBe("incapacidad-medica.pdf")
   })
 
-  test("si no reconoce el trámite, la crea por revisar y la coordinación la clasifica", async ({ browser }) => {
+  test("si no reconoce el trámite, la crea como Otro y el personal puede corregir el tipo", async ({ browser }) => {
     const asunto = unico("Consulta sobre mi situación académica")
     enviarAlBuzon(USUARIOS.bruno.correo, asunto, "Hola, quisiera saber qué opciones tengo con mi situación académica este semestre.")
 
     const solicitud = await esperarSolicitud(asunto)
-    expect(solicitud).toMatchObject({ tipo: "otro", revision: "por_revisar" })
-    expect(solicitud.motivo_revision).toBe("No se pudo identificar el tipo de trámite en el correo.")
+    expect(solicitud.tipo).toBe("otro")
 
-    const laura = await sesion(browser, "laura")
-    await laura.goto(`/gestion/solicitudes/${solicitud.id}`)
-    await expect(laura.getByText("Clasificación por revisar")).toBeVisible()
-    await expect(laura.getByText("No se pudo identificar el tipo de trámite en el correo.")).toBeVisible()
-    await laura.getByLabel("Tipo de solicitud").selectOption({ label: "Reingreso" })
-    await laura.getByRole("button", { name: "Confirmar tipo y marcar revisada" }).click()
-    await expect(laura.getByText("Clasificación guardada.")).toBeVisible()
+    const admin = await sesion(browser, "admin")
+    await admin.goto(`/gestion/solicitudes/${solicitud.id}`)
+    await admin.getByLabel("Tipo de solicitud").selectOption({ label: "Reingreso" })
+    await admin.getByRole("button", { name: "Guardar tipo" }).click()
+    await expect(admin.getByText("Clasificación guardada.")).toBeVisible()
   })
 
-  test("si menciona varios trámites, toma el del asunto y la deja por revisar", async () => {
+  test("si menciona varios trámites, toma el del asunto", async () => {
     const asunto = unico("Homologación de Programación I")
     enviarAlBuzon(
       USUARIOS.carla.correo,
@@ -62,19 +61,25 @@ test.describe("F4: correo a caso", () => {
       "Solicito la homologación. Si no procede, quisiera saber si puedo pedir supletorio del examen final."
     )
     const solicitud = await esperarSolicitud(asunto)
-    expect(solicitud).toMatchObject({ tipo: "homologacion", revision: "por_revisar" })
-    expect(solicitud.motivo_revision).toContain("varios trámites (Homologación, Supletorio)")
+    expect(solicitud.tipo).toBe("homologacion")
   })
 
-  test("anota en el motivo los adjuntos que no puede guardar", async ({}, info) => {
+  test("si el asunto no dice el trámite, toma el primero que menciona el correo", async () => {
+    const asunto = unico("Consulta urgente")
+    enviarAlBuzon(USUARIOS.carla.correo, asunto, "Quisiera pedir un supletorio del final. Si no se puede, consideraría la cancelación.")
+    const solicitud = await esperarSolicitud(asunto)
+    expect(solicitud.tipo).toBe("supletorio")
+  })
+
+  test("anota al final de la descripción los adjuntos que no puede guardar", async ({}, info) => {
     const asunto = unico("Reingreso para el próximo semestre")
     enviarAlBuzon(USUARIOS.bruno.correo, asunto, "Solicito el reingreso. Adjunto la carta.", {
       ruta: info.outputPath("carta.docx"),
       contenido: Buffer.from("no es un pdf"),
     })
     const solicitud = await esperarSolicitud(asunto)
-    expect(solicitud).toMatchObject({ tipo: "reingreso", revision: "por_revisar", adjunto_path: null })
-    expect(solicitud.motivo_revision).toContain("No se guardó: carta.docx")
+    expect(solicitud).toMatchObject({ tipo: "reingreso", adjunto_path: null })
+    expect(solicitud.descripcion).toContain("[No se guardó: carta.docx")
   })
 
   test("a un remitente sin cuenta le responde cómo registrarse y no crea nada", async () => {

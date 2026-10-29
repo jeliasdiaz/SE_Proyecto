@@ -1,17 +1,20 @@
 import { expect, test, type Page } from "@playwright/test"
-import { USUARIOS, cambiarEstado, crearSolicitud, pdfDePrueba, sesion, unico } from "./utilidades"
+import { cargaDeAsesores, responsableDe } from "./supabase-local"
+import { USUARIOS, cambiarEstado, crearSolicitud, pdfDePrueba, sesion, unico, usuarioDe, type Usuario } from "./utilidades"
 
-// El guion de la demo, en orden: estudiante registra → asesora toma y gestiona → otro asesor no
-// puede tocarla → estudiante ve el avance → admin reabre, reasigna y revisa la carga.
+// El guion de la demo, en orden: estudiante registra → queda asignada al asesor con menos carga →
+// otro asesor no puede tocarla → estudiante ve el avance → admin reabre, reasigna y revisa la carga.
 test.describe.serial("Recorrido de la demo", () => {
   const asunto = unico("Supletorio del parcial 2 de Bases de Datos")
   let id = ""
   let ana: Page
-  let laura: Page
+  // Quien recibe la solicitud depende de la carga del momento: se averigua en el paso 1.
+  let asignado: Usuario
+  let otro: Usuario
+  let asesor: Page
 
   test.beforeAll(async ({ browser }) => {
     ana = await sesion(browser, "ana")
-    laura = await sesion(browser, "laura")
   })
 
   test("el formulario valida antes de enviar", async () => {
@@ -38,6 +41,7 @@ test.describe.serial("Recorrido de la demo", () => {
   })
 
   test("1. la estudiante registra una solicitud con adjunto", async () => {
+    const carga = await cargaDeAsesores()
     id = await crearSolicitud(ana, {
       tipo: "Supletorio",
       asunto,
@@ -57,51 +61,54 @@ test.describe.serial("Recorrido de la demo", () => {
 
     await ana.goto("/mis-solicitudes")
     await expect(ana.getByRole("link", { name: asunto })).toBeVisible()
+
+    // La base la asignó al asesor que tenía menos solicitudes abiertas.
+    const correo = await responsableDe(id)
+    expect(correo).not.toBeNull()
+    expect(carga.get(correo!)).toBe(Math.min(...carga.values()))
+    asignado = usuarioDe(correo)
+    otro = asignado === "laura" ? "mateo" : "laura"
   })
 
-  test("2. la asesora la ve sin asignar en la bandeja y la toma", async () => {
-    await laura.goto(`/gestion?responsable=libres&q=${encodeURIComponent(asunto)}`)
-    const fila = laura.getByRole("row").filter({ hasText: asunto })
-    await expect(fila).toBeVisible()
-    await fila.getByRole("button", { name: "Tomar" }).click()
-    await expect(laura.getByText("La solicitud quedó a tu cargo.")).toBeVisible()
-    // Ya no está libre: sale del filtro "Sin asignar" y aparece en "Mías".
-    await expect(fila).toHaveCount(0)
-    await laura.goto(`/gestion?responsable=mias&q=${encodeURIComponent(asunto)}`)
-    await expect(laura.getByRole("row").filter({ hasText: asunto }).getByText("Tú")).toBeVisible()
+  test("2. le aparece al asesor asignado en Mías, sin pasar por Sin asignar", async ({ browser }) => {
+    asesor = await sesion(browser, asignado)
+    await asesor.goto(`/gestion?responsable=mias&q=${encodeURIComponent(asunto)}`)
+    await expect(asesor.getByRole("row").filter({ hasText: asunto }).getByText("Tú")).toBeVisible()
+    await asesor.goto(`/gestion?responsable=libres&q=${encodeURIComponent(asunto)}`)
+    await expect(asesor.getByText("Ninguna solicitud coincide con los filtros.")).toBeVisible()
   })
 
   test("3. otro asesor la ve en solo lectura", async ({ browser }) => {
-    const mateo = await sesion(browser, "mateo")
-    await mateo.goto(`/gestion/solicitudes/${id}`)
-    await expect(mateo.getByText(`La atiende ${USUARIOS.laura.nombre}`)).toBeVisible()
-    await expect(mateo.getByLabel("Nuevo estado")).toHaveCount(0)
-    await mateo.context().close()
+    const pagina = await sesion(browser, otro)
+    await pagina.goto(`/gestion/solicitudes/${id}`)
+    await expect(pagina.getByText(`La atiende ${USUARIOS[asignado].nombre}`)).toBeVisible()
+    await expect(pagina.getByLabel("Nuevo estado")).toHaveCount(0)
+    await pagina.context().close()
   })
 
-  test("4. la asesora descarga el adjunto", async () => {
-    await laura.goto(`/gestion/solicitudes/${id}`)
-    const descarga = laura.waitForEvent("download")
-    await laura.getByRole("button", { name: "incapacidad-medica.pdf" }).click()
+  test("4. el asesor descarga el adjunto", async () => {
+    await asesor.goto(`/gestion/solicitudes/${id}`)
+    const descarga = asesor.waitForEvent("download")
+    await asesor.getByRole("button", { name: "incapacidad-medica.pdf" }).click()
     expect((await descarga).suggestedFilename()).toBe("incapacidad-medica.pdf")
   })
 
   test("5. rechazar sin observación no se permite", async () => {
-    await laura.goto(`/gestion/solicitudes/${id}`)
-    await cambiarEstado(laura, "Rechazada")
-    await expect(laura.getByText("Explica al estudiante por qué se rechaza.")).toBeVisible()
+    await asesor.goto(`/gestion/solicitudes/${id}`)
+    await cambiarEstado(asesor, "Rechazada")
+    await expect(asesor.getByText("Explica al estudiante por qué se rechaza.")).toBeVisible()
     // Tras el error, el formulario sigue en "Rechazada" y la observación sigue marcada como obligatoria.
-    await expect(laura.getByLabel("Nuevo estado")).toHaveValue("rechazada")
-    await expect(laura.getByText("Motivo del rechazo (obligatorio)")).toBeVisible()
-    await expect(laura.getByText("Pendiente").first()).toBeVisible()
+    await expect(asesor.getByLabel("Nuevo estado")).toHaveValue("rechazada")
+    await expect(asesor.getByText("Motivo del rechazo (obligatorio)")).toBeVisible()
+    await expect(asesor.getByText("Pendiente").first()).toBeVisible()
   })
 
-  test("6. la asesora la pasa a En proceso con una observación", async () => {
-    await laura.goto(`/gestion/solicitudes/${id}`)
-    await cambiarEstado(laura, "En proceso", "Recibimos la incapacidad. La validamos con el docente.")
-    await expect(laura.getByText("Estado actualizado.")).toBeVisible()
-    await expect(laura.getByText("Respuesta vigente al estudiante")).toBeVisible()
-    const seguimiento = laura.locator("ol")
+  test("6. el asesor la pasa a En proceso con una observación", async () => {
+    await asesor.goto(`/gestion/solicitudes/${id}`)
+    await cambiarEstado(asesor, "En proceso", "Recibimos la incapacidad. La validamos con el docente.")
+    await expect(asesor.getByText("Estado actualizado.")).toBeVisible()
+    await expect(asesor.getByText("Respuesta vigente al estudiante")).toBeVisible()
+    const seguimiento = asesor.locator("ol")
     await expect(seguimiento.getByText("Recibimos la incapacidad. La validamos con el docente.")).toBeVisible()
   })
 
@@ -116,12 +123,12 @@ test.describe.serial("Recorrido de la demo", () => {
     await expect(ana.getByText("Coordinación académica").first()).toBeVisible()
   })
 
-  test("8. la asesora la finaliza y queda cerrada", async () => {
-    await laura.goto(`/gestion/solicitudes/${id}`)
-    await cambiarEstado(laura, "Finalizada", "Supletorio aprobado para el martes a las 10:00.")
-    await expect(laura.getByText("Solicitud cerrada")).toBeVisible()
+  test("8. el asesor la finaliza y queda cerrada", async () => {
+    await asesor.goto(`/gestion/solicitudes/${id}`)
+    await cambiarEstado(asesor, "Finalizada", "Supletorio aprobado para el martes a las 10:00.")
+    await expect(asesor.getByText("Solicitud cerrada")).toBeVisible()
     // El asesor no puede reabrir.
-    await expect(laura.getByLabel("Nuevo estado")).toHaveCount(0)
+    await expect(asesor.getByLabel("Nuevo estado")).toHaveCount(0)
 
     await ana.goto(`/mis-solicitudes/${id}`)
     await expect(ana.getByText("Finalizada").first()).toBeVisible()
@@ -137,18 +144,18 @@ test.describe.serial("Recorrido de la demo", () => {
     await expect(admin.getByText("Estado actualizado.")).toBeVisible()
     await expect(admin.getByText("En proceso").first()).toBeVisible()
 
-    await admin.getByLabel("Reasignar a").selectOption({ label: `${USUARIOS.mateo.nombre} · Asesoría` })
+    await admin.getByLabel("Reasignar a").selectOption({ label: `${USUARIOS[otro].nombre} · Asesoría` })
     await admin.getByRole("button", { name: "Reasignar" }).click()
     await expect(admin.getByText("Responsable actualizado.")).toBeVisible()
-    await expect(admin.getByText(USUARIOS.mateo.nombre).first()).toBeVisible()
+    await expect(admin.getByText(USUARIOS[otro].nombre).first()).toBeVisible()
 
-    // Laura ya no puede gestionarla; Mateo sí.
-    await laura.goto(`/gestion/solicitudes/${id}`)
-    await expect(laura.getByText(`La atiende ${USUARIOS.mateo.nombre}`)).toBeVisible()
-    const mateo = await sesion(browser, "mateo")
-    await mateo.goto(`/gestion?responsable=mias&q=${encodeURIComponent(asunto)}`)
-    await expect(mateo.getByRole("row").filter({ hasText: asunto })).toBeVisible()
-    await mateo.context().close()
+    // Quien la tenía ya no puede gestionarla; el nuevo responsable sí.
+    await asesor.goto(`/gestion/solicitudes/${id}`)
+    await expect(asesor.getByText(`La atiende ${USUARIOS[otro].nombre}`)).toBeVisible()
+    const nuevo = await sesion(browser, otro)
+    await nuevo.goto(`/gestion?responsable=mias&q=${encodeURIComponent(asunto)}`)
+    await expect(nuevo.getByRole("row").filter({ hasText: asunto })).toBeVisible()
+    await nuevo.context().close()
     await admin.context().close()
   })
 
@@ -193,21 +200,19 @@ test.describe("Otras situaciones de la demo", () => {
     await expect(laura.getByText("Solicitud cerrada")).toBeVisible()
   })
 
-  test("la asesora confirma la clasificación de un caso por revisar", async ({ browser }) => {
-    const laura = await sesion(browser, "laura")
-    await laura.goto("/gestion?revision=por_revisar&responsable=libres")
-    // La tabla llega por streaming: esperar a que haya filas o el aviso de vacío antes de contar.
-    await expect(laura.locator("tbody tr").first().or(laura.getByText("Ninguna solicitud coincide"))).toBeVisible()
-    const fila = laura.getByRole("row").filter({ hasText: "Por revisar" }).first()
-    test.skip((await fila.count()) === 0, "No quedan casos por revisar libres (corre `supabase db reset`).")
-    await fila.getByRole("link").first().click()
-    await expect(laura.getByText("Clasificación por revisar")).toBeVisible()
-    await laura.getByLabel("Tipo de solicitud").selectOption({ label: "Reingreso" })
-    await laura.getByRole("button", { name: "Confirmar tipo y marcar revisada" }).click()
-    await expect(laura.getByText("Clasificación guardada.")).toBeVisible()
-    await expect(laura.getByText("Clasificación por revisar")).toHaveCount(0)
-    // Clasificar un caso libre también lo toma.
-    await expect(laura.getByText("Tú", { exact: true })).toBeVisible()
+  test("el asesor asignado corrige el tipo de una solicitud", async ({ browser }) => {
+    const bruno = await sesion(browser, "bruno")
+    const id = await crearSolicitud(bruno, {
+      tipo: "Otro",
+      asunto: unico("Quiero volver a la universidad"),
+      descripcion: "Me retiré hace dos semestres y quisiera volver a estudiar el próximo periodo.",
+    })
+    const pagina = await sesion(browser, usuarioDe(await responsableDe(id)))
+    await pagina.goto(`/gestion/solicitudes/${id}`)
+    await pagina.getByLabel("Tipo de solicitud").selectOption({ label: "Reingreso" })
+    await pagina.getByRole("button", { name: "Guardar tipo" }).click()
+    await expect(pagina.getByText("Clasificación guardada.")).toBeVisible()
+    await expect(pagina.getByText(/^Reingreso · Registrada/)).toBeVisible()
   })
 
   test("la bandeja filtra por estado, tipo y texto", async ({ browser }) => {

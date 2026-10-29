@@ -1,12 +1,11 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ChevronLeftIcon, LockKeyholeIcon, ScanSearchIcon } from "lucide-react"
+import { ChevronLeftIcon, LockKeyholeIcon } from "lucide-react"
 import { z } from "zod"
 import { DescargarAdjunto } from "@/components/descargar-adjunto"
 import { EstadoBadge } from "@/components/estado-badge"
 import { HistorialTimeline, type EventoHistorial } from "@/components/historial-timeline"
-import { RevisionBadge } from "@/components/revision-badge"
 import { TransicionPagina } from "@/components/transicion-pagina"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,7 +31,7 @@ export default async function GestionSolicitudPage({ params }: PageProps<"/gesti
     supabase
       .from("solicitudes")
       .select(
-        "id, asunto, tipo, descripcion, estado, observaciones, origen, revision, motivo_revision, adjunto_path, creada, actualizada, estudiante_id, responsable_id, estudiante:perfiles!solicitudes_estudiante_id_fkey(nombre, correo, id_estudiantil), responsable:perfiles!solicitudes_responsable_id_fkey(nombre)"
+        "id, asunto, tipo, descripcion, estado, observaciones, origen, adjunto_path, creada, actualizada, estudiante_id, responsable_id, estudiante:perfiles!solicitudes_estudiante_id_fkey(nombre, correo, id_estudiantil), responsable:perfiles!solicitudes_responsable_id_fkey(nombre)"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -49,7 +48,6 @@ export default async function GestionSolicitudPage({ params }: PageProps<"/gesti
   if (error) throw error
   if (!solicitud) notFound()
 
-  const porRevisar = solicitud.revision === "por_revisar"
   const propia = solicitud.estudiante_id === perfil.id
   const deOtraPersona = solicitud.responsable_id !== null && solicitud.responsable_id !== perfil.id
   // El admin gestiona cualquier caso; el asesor, los libres y los suyos (lo mismo que exige RLS).
@@ -92,24 +90,12 @@ export default async function GestionSolicitudPage({ params }: PageProps<"/gesti
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">{solicitud.asunto}</h1>
             <EstadoBadge estado={solicitud.estado} />
-            {porRevisar && <RevisionBadge motivo={solicitud.motivo_revision} />}
           </div>
           <p className="text-sm text-muted-foreground">
             {ETIQUETA_TIPO[solicitud.tipo]} · Registrada el {formatearFechaHora(solicitud.creada)} · Origen:{" "}
             {ETIQUETA_ORIGEN[solicitud.origen].toLowerCase()} · Último cambio {tiempoRelativo(solicitud.actualizada)}
           </p>
         </div>
-
-        {porRevisar && (
-          <Alert className="border-violet-200 bg-violet-50 text-violet-900">
-            <ScanSearchIcon />
-            <AlertTitle>Clasificación por revisar</AlertTitle>
-            <AlertDescription className="text-violet-900/80">
-              {solicitud.motivo_revision ?? "El tipo se asignó automáticamente."} Confirma o corrige el tipo en el panel
-              Clasificación.
-            </AlertDescription>
-          </Alert>
-        )}
 
         <div className="grid items-start gap-6 lg:grid-cols-3">
           {/* Mobile-first: en móvil este contenedor no existe (contents) y el orden intercala las
@@ -200,7 +186,7 @@ export default async function GestionSolicitudPage({ params }: PageProps<"/gesti
                     <CardTitle>Clasificación</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <PanelClasificacion solicitudId={solicitud.id} tipoActual={solicitud.tipo} porRevisar={porRevisar} />
+                    <PanelClasificacion solicitudId={solicitud.id} tipoActual={solicitud.tipo} />
                   </CardContent>
                 </Card>
               </>

@@ -31,17 +31,17 @@ local), que reproduce producción. La sección 4 es lo que falta hacer o confirm
 | Suite | Qué cubre | Resultado |
 |---|---|---|
 | `npm run lint` · `next build` · TypeScript | Calidad estática y compilación de producción | ✅ Sin errores ni advertencias |
-| `npm run test:db` (`supabase/snippets/prueba-roles.sql`) | Permisos por rol en la base: asesor, admin, estudiante promovido y estudiante (crear, retirar, no fijar estado, no actuar a nombre de otro) | ✅ 50 comprobaciones |
+| `npm run test:db` (`supabase/snippets/prueba-roles.sql`) | Permisos por rol en la base: asesor, admin, estudiante promovido y estudiante (crear, retirar, no fijar estado, no actuar a nombre de otro); asignación automática al asesor con menos carga y sin asesores | ✅ 52 comprobaciones |
 | `e2e/autenticacion.spec.ts` | Login, errores, inicio por rol, accesos prohibidos, cerrar sesión, registro con confirmación por correo, recuperación de contraseña, enlace inválido | ✅ 11 |
-| `e2e/recorrido-demo.spec.ts` | **El guion de la demo** (sección 5) más retiro, clasificación por revisar, filtros y gestión de roles | ✅ 16 |
-| `e2e/correos-n8n.spec.ts` | Cadena web → webhook → n8n → correo: F1 a estudiante y coordinación, F2 en cada cambio, que tomar un caso no avise, HTML escapado, registro en `avisos_enviados` | ✅ 4 |
-| `e2e/concurrencia-y-tiempo-real.spec.ts` | Dos asesores toman el mismo caso a la vez (solo uno lo obtiene); la bandeja se actualiza sola | ✅ 2 |
+| `e2e/recorrido-demo.spec.ts` | **El guion de la demo** (sección 5) más retiro, corrección del tipo, filtros y gestión de roles | ✅ 16 |
+| `e2e/correos-n8n.spec.ts` | Cadena web → webhook → n8n → correo: F1 al estudiante y al asesor asignado, F2 en cada cambio, que corregir el tipo no avise, HTML escapado, registro en `avisos_enviados` | ✅ 4 |
+| `e2e/concurrencia-y-tiempo-real.spec.ts` | Dos asesores toman el mismo caso liberado a la vez (solo uno lo obtiene); la bandeja se actualiza sola | ✅ 2 |
 | `e2e/salud-pantallas.spec.ts` | Todas las pantallas de cada rol en escritorio y en celular: sin errores de consola ni desbordes | ✅ 8 |
 | `e2e/casos-borde.spec.ts` | Cuenta con sesión pero sin perfil | ✅ 1 |
-| `e2e/correo-a-caso.spec.ts` | F4: correo de estudiante con PDF → solicitud con adjunto y aviso de F1, visible y descargable en la web; trámite no reconocido → por revisar y clasificación; varios trámites; adjunto no permitido; remitente desconocido (respuesta, sin caso); personal de la coordinación | ✅ 6 |
+| `e2e/correo-a-caso.spec.ts` | F4: correo de estudiante con PDF → solicitud con adjunto y aviso de F1, visible y descargable en la web; trámite no reconocido → Otro y corrección del tipo; varios trámites (el del asunto o el primero que menciona); adjunto no permitido (anotado en la descripción); remitente desconocido (respuesta, sin caso); personal de la coordinación | ✅ 7 |
 | `e2e/recordatorios.spec.ts` | F3: un resumen por persona con sus casos estancados (los sin responsable, a los admins); una segunda ejecución no repite | ✅ 1 |
 
-La suite completa (49 pruebas) pasa con la base recién reseteada. Las 42 que no dependen de F3 y
+La suite completa (50 pruebas) pasa con la base recién reseteada. Las 42 que no dependen de F3 y
 F4 pasaron además dos veces seguidas sin reiniciar la base: se pueden repetir cuantas veces se
 quiera.
 
@@ -158,9 +158,9 @@ empezar: estudiante, asesor A, asesor B, admin y el buzón del estudiante.
 | Paso | Quién | Qué se muestra | Qué decir | Prueba que lo cubre |
 |---|---|---|---|---|
 | 0 | — | Problema y solución | Trámites por correo sin trazabilidad → CRM de servicio con enfoque BPM | — |
-| 1 | Estudiante | Nueva solicitud (Supletorio) con un PDF → queda Pendiente con su seguimiento | El estudiante no elige estado ni dueño: lo pone la base | `recorrido-demo` 1 |
-| 2 | Buzón | Correo "Recibimos tu solicitud" | n8n F1, disparado por el webhook de Supabase | `correos-n8n` F1 |
-| 3 | Asesor A | Bandeja → chip "Sin asignar" → **Tomar** | Mientras, la bandeja del asesor B se actualiza sola (tiempo real) | `recorrido-demo` 2, `concurrencia…` |
+| 1 | Estudiante | Nueva solicitud (Supletorio) con un PDF → queda Pendiente con su seguimiento | El estudiante no elige estado ni dueño: la base la asigna al asesor con menos solicitudes abiertas | `recorrido-demo` 1 |
+| 2 | Buzón | Correo "Recibimos tu solicitud" al estudiante y "Se te asignó una solicitud" al asesor | n8n F1, disparado por el webhook de Supabase | `correos-n8n` F1 |
+| 3 | Asesor A (el asignado) | Bandeja → chip "Mías": la solicitud ya está ahí, sin tomarla | Nadie reparte a mano: la carga se equilibra sola | `recorrido-demo` 2 |
 | 4 | Asesor B | Abre el mismo caso: solo lectura, "La atiende …" | La regla vive en la base (RLS + trigger), no en la interfaz | `recorrido-demo` 3 |
 | 5 | Asesor A | Descarga el adjunto. Intenta **Rechazar sin motivo** → error. Pasa a **En proceso** con observación | Reglas de negocio: rechazar exige motivo | `recorrido-demo` 4–6 |
 | 6 | Estudiante + buzón | Ve "En proceso", la respuesta y el correo de F2. Ya no puede retirarla | Cada cambio queda en el historial y se avisa | `recorrido-demo` 7, `correos-n8n` F2 |
@@ -174,8 +174,8 @@ Automatización con F3 y F4 (probados en local; en la nube, después del punto 8
 
 | Paso | Quién | Qué se muestra | Qué decir | Prueba que lo cubre |
 |---|---|---|---|---|
-| 12 | Estudiante | Envía desde su correo, al buzón del proyecto, un correo que no diga qué trámite es. En menos de un minuto aparece como solicitud *Recibida por correo* y *Por revisar*, y le llega la confirmación de F1 | Tarea 1: el correo se vuelve caso sin transcribirlo; lo ambiguo va a revisión humana | `correo-a-caso` |
-| 13 | Asesor | Lee el motivo y confirma la clasificación | La automatización sugiere, la persona decide | `correo-a-caso` |
+| 12 | Estudiante | Envía desde su correo, al buzón del proyecto, un correo que no diga qué trámite es. En menos de un minuto aparece como solicitud *Recibida por correo* de tipo *Otro*, asignada a un asesor, y le llega la confirmación de F1 | Tarea 1: el correo se vuelve caso sin transcribirlo | `correo-a-caso` |
+| 13 | Asesor | Corrige el tipo en el panel Clasificación | La automatización propone el tipo; el asesor lo corrige si hace falta | `correo-a-caso` |
 | 14 | — | Un correo desde una dirección sin cuenta recibe la respuesta de cómo registrarse | No se crean casos de desconocidos | `correo-a-caso` |
 | 15 | Admin | En n8n, *Ejecutar ahora* en F3 → el resumen de casos estancados llega a cada responsable | Normalmente corre todos los días a las 8:00; no repite avisos | `recordatorios` |
 
@@ -202,7 +202,7 @@ infra/verificar-demo.sh
 - **Un día antes:** todo lo de la sección 4 en OK; ensayo completo del guion en producción, con
   cronómetro; recorrido del plan B en el portátil que se va a usar.
 - **Dos horas antes:** `verificar-demo.sh`; registrar una solicitud de prueba y confirmar que llegan
-  los dos correos (estudiante y coordinación); retirarla después. Enviar un correo de prueba al buzón
+  los dos correos (estudiante y asesor asignado); retirarla después. Enviar un correo de prueba al buzón
   del proyecto y confirmar que F4 crea el caso.
 - **15 minutos antes:** `verificar-demo.sh`; sesiones iniciadas en cada navegador; buzón abierto;
   pantalla y zoom del proyector probados; notificaciones del sistema silenciadas.
