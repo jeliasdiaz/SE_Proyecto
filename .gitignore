@@ -25,6 +25,7 @@ dist/
 n8n_data/
 infra/data/
 infra/backups/
+n8n/azure/respaldos/
 
 # Logs
 *.log

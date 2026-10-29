@@ -53,7 +53,7 @@ quiera.
 |---|---|---|---|
 | 1 | `/auth/confirm` redirigía a `localhost:3000` sin importar el dominio real (en `next start`, `request.nextUrl` trae localhost). La sesión quedaba en otro origen. | Registro y recuperación de contraseña dejaban al usuario **"sin sesión"** al usar la app por `127.0.0.1` (la `site_url` local): rompía el plan B. | `web/src/app/auth/confirm/route.ts` redirige con rutas relativas (`redirect()` de Next). |
 | 2 | Una cuenta con sesión pero sin perfil (creada antes del trigger o con el perfil borrado) entraba en un **bucle `/` ↔ `/login`**. | Pantalla en blanco si alguien entra con una cuenta así. | `lib/auth.ts`, `app/page.tsx`, `lib/supabase/proxy.ts`: el login muestra un aviso claro y permite entrar con otra cuenta. |
-| 3 | F2 no conocía el estado **Retirada** (correo con "retirada" en minúscula y sin mensaje) y al **reabrir** decía "La coordinación empezó a revisar tu solicitud". | Correos raros justo en dos momentos que se pueden mostrar. | `n8n/F2-cambio-estado.json`: etiqueta y mensaje para Retirada; asunto y mensaje propios para la reapertura. **Hay que reimportarlo en Azure.** |
+| 3 | F2 no conocía el estado **Retirada** (correo con "retirada" en minúscula y sin mensaje) y al **reabrir** decía "La coordinación empezó a revisar tu solicitud". | Correos raros justo en dos momentos que se pueden mostrar. | `n8n/F2-cambio-estado.json`: etiqueta y mensaje para Retirada; asunto y mensaje propios para la reapertura (desplegado en Azure el 27/10). |
 | 4 | Al intentar rechazar sin observación, el error salía pero el selector volvía a "Elige el siguiente paso" y la etiqueta a "(opcional)". | Mostrar la regla de negocio "rechazar exige motivo" se veía confuso. | `panel-gestion.tsx`: el formulario conserva lo elegido si falla y se limpia solo si el cambio sale bien. |
 | 5 | El aviso de desbalance decía "Mateo concentra el 50 %" cuando Laura tenía el mismo número de casos. | Con los datos de prueba, el aviso nombraba a uno solo en un empate. | `admin/page.tsx`: con empate en el primer lugar no se muestra. |
 | 6 | En n8n local, `APP_URL` era `localhost` y la web vive en `127.0.0.1`. | El enlace del correo abría la app sin sesión. | `n8n/local/.env.example` y `docker-compose.yml` usan `127.0.0.1`. |
@@ -87,14 +87,14 @@ Responsables según [`issues-github.md`](issues-github.md). Cada punto dice cóm
    inexistente devolvía "No pudimos completar la operación"; después de restaurarlo devuelve
    "Correo o contraseña incorrectos", como en local. Los proyectos gratuitos se pausan tras 7 días
    sin actividad: **entrar a la app a diario hasta la demo**.
-2. **Desplegar las correcciones en Vercel.** La web pública (`gestion-solicitudes-se.vercel.app`)
-   funciona, pero corre el commit `fcff23f` del 24/09, sin las correcciones de la sección 3. Al
-   integrar los cambios a la rama de producción, Vercel despliega; volver a correr
-   `verificar-demo.sh`. De paso, actualizar el sitio del repositorio en GitHub: todavía apunta a
-   `se-proyecto-two.vercel.app`, que ya no existe.
-3. **Migraciones aplicadas en la nube.** Deben estar las 10 de `supabase/migrations/`, en especial
-   las del rol asesor (`20260925*`) y `20260926000100_rendimiento.sql`: sin `conteos_bandeja()` la
-   bandeja falla. Comprobar en el SQL Editor:
+2. ✅ **Correcciones desplegadas en Vercel** (PR #36, 27/10); `verificar-demo.sh` en verde. Falta
+   actualizar el sitio del repositorio en GitHub: todavía apunta a `se-proyecto-two.vercel.app`,
+   que ya no existe.
+3. **Migraciones aplicadas en la nube.** Deben estar las 12 de `supabase/migrations/`, en especial
+   las del rol asesor (`20260925*`), `20260926000100_rendimiento.sql` (sin `conteos_bandeja()` la
+   bandeja falla) y las de asignación automática (`20261028*`). `20261028000200_sin_por_revisar.sql`
+   borra columnas que el F4 anterior enviaba: va siempre después de publicar el F4 nuevo (hecho el
+   29/10). Comprobar en el SQL Editor:
    `select version from supabase_migrations.schema_migrations order by 1;`
    o, con el proyecto vinculado, `npx supabase migration list --linked`.
 4. **Autenticación en la nube** (Authentication en el panel). `supabase/config.toml` solo aplica en local:
@@ -102,40 +102,33 @@ Responsables según [`issues-github.md`](issues-github.md). Cada punto dice cóm
    - *Email Templates*: pegar `supabase/templates/confirmacion.html` y `recuperacion.html`, con los
      asuntos de `config.toml`. Sin ellas los enlaces no pasan por `/auth/confirm` y la recuperación
      de contraseña no funciona.
-   - *SMTP*: el correo incluido de Supabase solo entrega a los miembros del equipo del proyecto y
-     unos pocos por hora. Para registrar un estudiante en vivo, configurar el SMTP del buzón del
-     proyecto (contraseña de aplicación) o usar cuentas creadas de antemano.
+   - ✅ *SMTP*: el correo incluido de Supabase solo entrega a los miembros del equipo del proyecto
+     y unos pocos por hora. Configurado con el buzón del proyecto, `gestionsolicitudes.se@gmail.com`
+     (contraseña de aplicación).
 5. ✅ **Database Webhooks en la nube (#25).** Existen los dos, hacia
    `https://n8n-request.chilecentral.cloudapp.azure.com/webhook/f1-registro` y `.../f2-cambio-estado`.
-   F3 y F4 no necesitan webhook. Falta confirmar que de verdad llegan correos: registrar una
-   solicitud de prueba y ver las filas nuevas en `avisos_enviados`
-   (`select tipo_aviso, destinatario, resultado, fecha from avisos_enviados order by fecha desc limit 10;`).
-6. **n8n en Azure.** En línea, con certificado vigente hasta el 19/12, y F1 y F2 publicados y
-   protegidos (403 sin el secreto). Falta, desde la interfaz de n8n (*Import from File* en cada flujo):
-   - **Reimportar F1, F2 y Enviar-aviso desde el repositorio.** La copia local de F1 era una versión
-     anterior (solo avisaba a admins y enlazaba a `/admin/solicitudes`); la de Azure puede estar
-     igual. F2 trae la corrección #3 y Enviar-aviso el cambio para F3.
-   - Variables del contenedor: `APP_URL` = URL de producción, `CORREO_REMITENTE`,
-     `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` y, nueva para F4, `SUPABASE_URL` (ver punto 8).
-   - Después de importar, elegir en cada nodo las credenciales de producción (SMTP, Supabase,
-     encabezado secreto e IMAP).
+   F3 y F4 no necesitan webhook. F1 y F2 se ejecutaron con éxito en producción el 27/10.
+6. ✅ **n8n en Azure actualizado (27–28/10).** Los cinco flujos del repositorio están publicados,
+   desplegados con [`n8n/azure/desplegar.py`](../n8n/azure/README.md) (**no importarlos a mano**:
+   llevan los ids locales de credenciales y de Enviar-aviso). Certificado vigente hasta el 19/12.
+   - La credencial IMAP de F4 y el SMTP de n8n eran el Gmail personal de un integrante: el F4
+     completo le habría respondido a cualquier remitente de su bandeja. Ahora ambos usan el buzón
+     del proyecto, `gestionsolicitudes.se@gmail.com`.
+   - Sin acceso a la VM, `SUPABASE_URL` y el remitente van escritos en los nodos (la variable
+     `CORREO_REMITENTE` de la VM sigue con el correo anterior). `APP_URL` ya apuntaba a producción.
 7. **Cuentas para la demo en producción.** Un admin, dos asesores y un estudiante cuyo buzón se pueda
    abrir en pantalla para mostrar los correos. Los estudiantes de `seed-nube.sql` (`@demo.test`)
    no reciben correos ni tienen contraseña conocida: sirven de relleno, no para el recorrido.
-8. **Desplegar F3 y F4 en Azure** (issues #21, #23). Ya están escritos y probados en local.
-   - Importar `n8n/F3-recordatorio.json` y `n8n/F4-correo-a-caso.json`. F4 conserva el id del flujo
-     de lectura de Santiago (`KFHt4aD0YlAJMrYr`), así que lo reemplaza en vez de duplicarlo.
-     Mientras tanto, si ese flujo de lectura está publicado, **despublicarlo**: marca cada correo
-     como leído sin crear nada, y esos correos ya no los vería el F4 completo.
-   - `SUPABASE_URL` (la *Project URL* de Supabase) debe existir como variable del contenedor de
-     n8n, porque F4 la usa para subir los adjuntos. Agregarla en el `.env` de la VM requiere acceso
-     a Azure. Si no se consigue a tiempo, se puede escribir la URL directamente en el campo URL del
-     nodo *Subir adjunto* (no es un secreto).
-   - Credenciales: IMAP del buzón del proyecto en *Recibir correos nuevos*, Supabase de producción
-     en los nodos Supabase y en *Subir adjunto*.
-   - Publicar los dos y probar: un correo desde la cuenta de un estudiante al buzón del proyecto
-     debe crear la solicitud en menos de un minuto, y llegarle la confirmación de F1. Para F3,
-     *Ejecutar ahora* en el editor.
+8. ✅ **F3 y F4 en Azure** (issues #21, #23), probados en producción:
+   - F3 corrió solo a las 8:00 del 28/10 y envió los recordatorios.
+   - F4, el 29/10: un correo de un estudiante a `gestionsolicitudes.se@gmail.com` se volvió
+     solicitud en segundos, la base la asignó a un asesor y F1 avisó a los dos.
+   - Tras el cambio de buzón, F4 estuvo un día sin procesar nada y sin mostrar errores: el
+     disparador IMAP guardaba el UID del último correo del buzón anterior y descartaba los del
+     nuevo, que numera desde 1. Ahora el script lo reinicia al cambiar la credencial IMAP (ver
+     [`n8n/azure/README.md`](../n8n/azure/README.md)).
+   - Falta en producción: un cambio de estado (F2) y el registro y la recuperación de contraseña
+     con el SMTP nuevo de Supabase.
 
 ### P1: importante
 
@@ -170,7 +163,7 @@ empezar: estudiante, asesor A, asesor B, admin y el buzón del estudiante.
 | 10 | Admin | **Roles**: buscar un estudiante y hacerlo asesor | El rol admin solo se da por SQL | `recorrido-demo` (roles) |
 | 11 | Cualquiera | Seguimiento completo de la solicitud | Trazabilidad: quién, cuándo, de qué estado a cuál | — |
 
-Automatización con F3 y F4 (probados en local; en la nube, después del punto 8 de la sección 4):
+Automatización con F3 y F4 (publicados en la nube y probados en producción, punto 8 de la sección 4):
 
 | Paso | Quién | Qué se muestra | Qué decir | Prueba que lo cubre |
 |---|---|---|---|---|

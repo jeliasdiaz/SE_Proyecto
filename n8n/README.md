@@ -24,10 +24,14 @@ Antes de hacer commit, revisar que el JSON no contenga secretos: las credenciale
 `asunto`, `cuerpo` (HTML), `tipo_aviso` y `solicitud_id`, o `solicitud_ids` cuando un correo cubre
 varias solicitudes (el resumen de F3): entonces registra una fila por cada una. Lo usan F1, F2, F3 y F4.
 
-Al importar en Azure, los flujos piden las variables `APP_URL` (enlaces de los correos),
-`CORREO_REMITENTE` y, para F4, `SUPABASE_URL` (sube los adjuntos a Storage), además de
-`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`. Las credenciales se eligen de nuevo en cada nodo, con las de
-producción. F4 conserva el id del flujo de lectura que ya estaba en Azure: al importarlo lo reemplaza.
+Los flujos leen las variables `APP_URL` (enlaces de los correos), `CORREO_REMITENTE` y, para F4,
+`SUPABASE_URL` (sube los adjuntos a Storage), además de requerir `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`.
+
+## Despliegue en Azure
+
+Con [`azure/desplegar.py`](azure/desplegar.py), no importándolos a mano: los JSON llevan los ids
+de las credenciales locales y del subflujo Enviar-aviso, que en Azure son otros. Ver
+[`azure/README.md`](azure/README.md).
 
 ## Desarrollo local
 
