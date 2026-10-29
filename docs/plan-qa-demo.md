@@ -117,8 +117,16 @@ Responsables según [`issues-github.md`](issues-github.md). Cada punto dice cóm
    - Sin acceso a la VM, `SUPABASE_URL` y el remitente van escritos en los nodos (la variable
      `CORREO_REMITENTE` de la VM sigue con el correo anterior). `APP_URL` ya apuntaba a producción.
 7. **Cuentas para la demo en producción.** Un admin, dos asesores y un estudiante cuyo buzón se pueda
-   abrir en pantalla para mostrar los correos. Los estudiantes de `seed-nube.sql` (`@demo.test`)
-   no reciben correos ni tienen contraseña conocida: sirven de relleno, no para el recorrido.
+   abrir en pantalla para mostrar los correos. Los estudiantes sintéticos (`@demo.test`) no reciben
+   correos ni tienen contraseña conocida: sirven de relleno, no para el recorrido.
+   - **Datos de relleno:** sobre la base vacía, `supabase/seed-organico.sql` simula 8 semanas de uso
+     (120 solicitudes de 16 estudiantes sintéticos, con temporada de semestre, asignación como la
+     del trigger, tiempos por tipo, rechazos, retiros, reaperturas y casos estancados), sin enviar
+     correos. Con `c_estudiante_demo` le da al estudiante de la demo 3 solicitudes antiguas. Se
+     quita con `supabase/snippets/limpiar-seed-organico.sql`. (`seed-nube.sql` es la versión
+     anterior, más simple.)
+   - Al día siguiente de cargarlo, F3 les manda a los asesores, a las 8:00, recordatorios reales de
+     los casos estancados.
 8. ✅ **F3 y F4 en Azure** (issues #21, #23), probados en producción:
    - F3 corrió solo a las 8:00 del 28/10 y envió los recordatorios.
    - F4, el 29/10: un correo de un estudiante a `gestionsolicitudes.se@gmail.com` se volvió
